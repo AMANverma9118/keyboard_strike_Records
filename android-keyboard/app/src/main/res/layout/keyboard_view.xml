@@ -14,45 +14,115 @@
         android:paddingStart="@dimen/keyboard_padding_h"
         android:paddingEnd="@dimen/keyboard_padding_h">
 
-        <LinearLayout
-            android:id="@+id/toolbar_strip"
+        <FrameLayout
+            android:id="@+id/toolbar_suggestion_container"
             android:layout_width="match_parent"
-            android:layout_height="@dimen/toolbar_height"
-            android:gravity="center_vertical"
-            android:orientation="horizontal"
-            android:paddingStart="@dimen/toolbar_padding_h"
-            android:paddingEnd="@dimen/toolbar_padding_h">
+            android:layout_height="@dimen/toolbar_height">
 
-            <ImageButton
-                android:id="@+id/btn_toolbar_grid"
-                style="@style/ToolbarIconButtonStyle"
-                android:contentDescription="@string/toolbar_grid"
-                android:src="@drawable/ic_toolbar_grid" />
+            <LinearLayout
+                android:id="@+id/toolbar_strip"
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                android:gravity="center_vertical"
+                android:orientation="horizontal"
+                android:paddingStart="@dimen/toolbar_padding_h"
+                android:paddingEnd="@dimen/toolbar_padding_h">
 
-            <ImageButton
-                android:id="@+id/btn_toolbar_clipboard"
-                style="@style/ToolbarIconButtonStyle"
-                android:contentDescription="@string/toolbar_clipboard"
-                android:src="@drawable/ic_toolbar_clipboard" />
+                <ImageButton
+                    android:id="@+id/btn_toolbar_grid"
+                    style="@style/ToolbarIconButtonStyle"
+                    android:contentDescription="@string/toolbar_grid"
+                    android:src="@drawable/ic_toolbar_grid" />
 
-            <ImageButton
-                android:id="@+id/btn_toolbar_translate"
-                style="@style/ToolbarIconButtonStyle"
-                android:contentDescription="@string/toolbar_translate"
-                android:src="@drawable/ic_toolbar_translate" />
+                <ImageButton
+                    android:id="@+id/btn_toolbar_clipboard"
+                    style="@style/ToolbarIconButtonStyle"
+                    android:contentDescription="@string/toolbar_clipboard"
+                    android:src="@drawable/ic_toolbar_clipboard" />
 
-            <ImageButton
-                android:id="@+id/btn_toolbar_palette"
-                style="@style/ToolbarIconButtonStyle"
-                android:contentDescription="@string/toolbar_palette"
-                android:src="@drawable/ic_toolbar_palette" />
+                <ImageButton
+                    android:id="@+id/btn_toolbar_translate"
+                    style="@style/ToolbarIconButtonStyle"
+                    android:contentDescription="@string/toolbar_translate"
+                    android:src="@drawable/ic_toolbar_translate" />
 
-            <ImageButton
-                android:id="@+id/btn_toolbar_mic"
-                style="@style/ToolbarIconButtonStyle"
-                android:contentDescription="@string/toolbar_mic"
-                android:src="@drawable/ic_toolbar_mic" />
-        </LinearLayout>
+                <ImageButton
+                    android:id="@+id/btn_toolbar_palette"
+                    style="@style/ToolbarIconButtonStyle"
+                    android:contentDescription="@string/toolbar_palette"
+                    android:src="@drawable/ic_toolbar_palette" />
+
+                <ImageButton
+                    android:id="@+id/btn_toolbar_mic"
+                    style="@style/ToolbarIconButtonStyle"
+                    android:contentDescription="@string/toolbar_mic"
+                    android:src="@drawable/ic_toolbar_mic" />
+            </LinearLayout>
+
+            <LinearLayout
+                android:id="@+id/suggestion_strip"
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                android:gravity="center_vertical"
+                android:orientation="horizontal"
+                android:paddingStart="4dp"
+                android:paddingEnd="4dp"
+                android:visibility="gone">
+
+                <TextView
+                    android:id="@+id/suggestion_left"
+                    android:layout_width="0dp"
+                    android:layout_height="match_parent"
+                    android:layout_weight="1"
+                    android:background="@drawable/suggestion_chip_background"
+                    android:ellipsize="end"
+                    android:gravity="center"
+                    android:maxLines="1"
+                    android:paddingStart="8dp"
+                    android:paddingEnd="8dp"
+                    android:textColor="@color/suggestion_text"
+                    android:textSize="@dimen/suggestion_text_size" />
+
+                <View
+                    android:layout_width="1dp"
+                    android:layout_height="24dp"
+                    android:background="@color/suggestion_divider" />
+
+                <TextView
+                    android:id="@+id/suggestion_center"
+                    android:layout_width="0dp"
+                    android:layout_height="match_parent"
+                    android:layout_weight="1.15"
+                    android:background="@drawable/suggestion_chip_background"
+                    android:ellipsize="end"
+                    android:gravity="center"
+                    android:maxLines="1"
+                    android:paddingStart="8dp"
+                    android:paddingEnd="8dp"
+                    android:textColor="@color/suggestion_text_primary"
+                    android:textSize="@dimen/suggestion_text_primary_size"
+                    android:textStyle="bold" />
+
+                <View
+                    android:layout_width="1dp"
+                    android:layout_height="24dp"
+                    android:background="@color/suggestion_divider" />
+
+                <TextView
+                    android:id="@+id/suggestion_right"
+                    android:layout_width="0dp"
+                    android:layout_height="match_parent"
+                    android:layout_weight="1"
+                    android:background="@drawable/suggestion_chip_background"
+                    android:ellipsize="end"
+                    android:gravity="center"
+                    android:maxLines="1"
+                    android:paddingStart="8dp"
+                    android:paddingEnd="8dp"
+                    android:textColor="@color/suggestion_text"
+                    android:textSize="@dimen/suggestion_text_size" />
+            </LinearLayout>
+        </FrameLayout>
 
         <FrameLayout
             android:id="@+id/keyboard_body"

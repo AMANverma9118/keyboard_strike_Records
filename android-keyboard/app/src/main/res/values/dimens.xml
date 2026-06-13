@@ -8,7 +8,7 @@
     <dimen name="row_indent">12dp</dimen>
     <dimen name="keyboard_padding_h">2dp</dimen>
     <dimen name="keyboard_padding_v">2dp</dimen>
-    <dimen name="key_text_size">18sp</dimen>
+    <dimen name="key_text_size">23sp</dimen>
     <dimen name="key_hint_text_size">8sp</dimen>
     <dimen name="key_function_text_size">13sp</dimen>
     <dimen name="key_emoji_text_size">17sp</dimen>
@@ -27,5 +27,7 @@
     <dimen name="keyboard_footer_icon_size">24dp</dimen>
     <dimen name="keyboard_footer_padding_h">20dp</dimen>
     <dimen name="bottom_row_margin_bottom">4dp</dimen>
-    <dimen name="keyboard_padding_bottom">0dp</dimen>
+    <dimen name="suggestion_strip_height">40dp</dimen>
+    <dimen name="suggestion_text_size">15sp</dimen>
+    <dimen name="suggestion_text_primary_size">16sp</dimen>
 </resources>
