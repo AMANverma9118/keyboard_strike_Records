@@ -1,0 +1,26 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Gboard dark gray theme -->
+    <color name="keyboard_background">#2B2B2B</color>
+    <color name="toolbar_background">#2B2B2B</color>
+    <color name="key_background">#464646</color>
+    <color name="key_background_pressed">#5A5A5A</color>
+    <color name="key_function_background">#464646</color>
+    <color name="key_function_pressed">#5A5A5A</color>
+    <color name="key_enter_background">#505050</color>
+    <color name="key_enter_pressed">#636363</color>
+    <color name="key_shift_active">#5A5A5A</color>
+    <color name="key_text">#E8EAED</color>
+    <color name="key_text_secondary">#BDC1C6</color>
+    <color name="key_hint_text">#9AA0A6</color>
+    <color name="keyboard_footer_background">#1F1F1F</color>
+    <color name="key_divider">#3C3C3C</color>
+    <color name="toolbar_icon">#BDC1C6</color>
+    <color name="footer_icon">#9AA0A6</color>
+    <color name="settings_background">#F1F3F4</color>
+    <color name="text_primary">#202124</color>
+    <color name="text_secondary">#5F6368</color>
+    <color name="primary">#9AA0A6</color>
+    <color name="emoji_category_active">#5C4A5E</color>
+    <color name="emoji_tab_active">#8E4585</color>
+</resources>

@@ -1,0 +1,260 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:background="@color/keyboard_background"
+    android:orientation="vertical"
+    android:paddingTop="@dimen/keyboard_padding_v"
+    android:paddingBottom="0dp">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:paddingStart="@dimen/keyboard_padding_h"
+        android:paddingEnd="@dimen/keyboard_padding_h">
+
+        <LinearLayout
+            android:id="@+id/toolbar_strip"
+            android:layout_width="match_parent"
+            android:layout_height="@dimen/toolbar_height"
+            android:gravity="center_vertical"
+            android:orientation="horizontal"
+            android:paddingStart="@dimen/toolbar_padding_h"
+            android:paddingEnd="@dimen/toolbar_padding_h">
+
+            <ImageButton
+                android:id="@+id/btn_toolbar_grid"
+                style="@style/ToolbarIconButtonStyle"
+                android:contentDescription="@string/toolbar_grid"
+                android:src="@drawable/ic_toolbar_grid" />
+
+            <ImageButton
+                android:id="@+id/btn_toolbar_clipboard"
+                style="@style/ToolbarIconButtonStyle"
+                android:contentDescription="@string/toolbar_clipboard"
+                android:src="@drawable/ic_toolbar_clipboard" />
+
+            <ImageButton
+                android:id="@+id/btn_toolbar_translate"
+                style="@style/ToolbarIconButtonStyle"
+                android:contentDescription="@string/toolbar_translate"
+                android:src="@drawable/ic_toolbar_translate" />
+
+            <ImageButton
+                android:id="@+id/btn_toolbar_palette"
+                style="@style/ToolbarIconButtonStyle"
+                android:contentDescription="@string/toolbar_palette"
+                android:src="@drawable/ic_toolbar_palette" />
+
+            <ImageButton
+                android:id="@+id/btn_toolbar_mic"
+                style="@style/ToolbarIconButtonStyle"
+                android:contentDescription="@string/toolbar_mic"
+                android:src="@drawable/ic_toolbar_mic" />
+        </LinearLayout>
+
+        <FrameLayout
+            android:id="@+id/keyboard_body"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content">
+
+            <LinearLayout
+                android:id="@+id/panel_letters"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical">
+
+                <LinearLayout
+                    android:id="@+id/row_1"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="horizontal" />
+
+                <LinearLayout
+                    android:id="@+id/row_2"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginStart="@dimen/row_indent"
+                    android:layout_marginEnd="@dimen/row_indent"
+                    android:orientation="horizontal" />
+
+                <LinearLayout
+                    android:id="@+id/row_3"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="horizontal" />
+            </LinearLayout>
+
+            <LinearLayout
+                android:id="@+id/panel_symbols"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:visibility="gone">
+
+                <LinearLayout
+                    android:id="@+id/symbol_row_1"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="horizontal" />
+
+                <LinearLayout
+                    android:id="@+id/symbol_row_2"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="horizontal" />
+
+                <LinearLayout
+                    android:id="@+id/symbol_row_3"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="horizontal" />
+            </LinearLayout>
+
+            <include layout="@layout/panel_emoji" />
+        </FrameLayout>
+
+        <LinearLayout
+            android:id="@+id/bottom_row"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginBottom="@dimen/bottom_row_margin_bottom"
+            android:orientation="horizontal">
+
+            <Button
+                android:id="@+id/btn_mode_switch"
+                style="@style/KeyboardFunctionKeyStyle"
+                android:layout_width="0dp"
+                android:layout_height="@dimen/key_height"
+                android:layout_margin="@dimen/key_margin_h"
+                android:layout_weight="1.15"
+                android:text="@string/key_symbols" />
+
+            <Button
+                android:id="@+id/btn_comma"
+                style="@style/KeyboardLetterKeyStyle"
+                android:layout_width="0dp"
+                android:layout_height="@dimen/key_height"
+                android:layout_margin="@dimen/key_margin_h"
+                android:layout_weight="0.8"
+                android:text="@string/key_comma_slash" />
+
+            <ImageButton
+                android:id="@+id/btn_emoji"
+                style="@style/KeyboardIconKeyStyle"
+                android:layout_width="0dp"
+                android:layout_height="@dimen/key_height"
+                android:layout_margin="@dimen/key_margin_h"
+                android:layout_weight="0.95"
+                android:contentDescription="@string/key_emoji"
+                android:src="@drawable/ic_emoji" />
+
+            <Button
+                android:id="@+id/btn_space"
+                style="@style/KeyboardSpaceKeyStyle"
+                android:layout_width="0dp"
+                android:layout_height="@dimen/key_height"
+                android:layout_margin="@dimen/key_margin_h"
+                android:layout_weight="4.8"
+                android:contentDescription="@string/key_space"
+                android:text="" />
+
+            <Button
+                android:id="@+id/btn_period"
+                style="@style/KeyboardLetterKeyStyle"
+                android:layout_width="0dp"
+                android:layout_height="@dimen/key_height"
+                android:layout_margin="@dimen/key_margin_h"
+                android:layout_weight="0.8"
+                android:text="." />
+
+            <ImageButton
+                android:id="@+id/btn_enter"
+                style="@style/KeyboardSearchKeyStyle"
+                android:layout_width="0dp"
+                android:layout_height="@dimen/key_height"
+                android:layout_margin="@dimen/key_margin_h"
+                android:layout_weight="1.15"
+                android:contentDescription="@string/key_enter"
+                android:src="@drawable/ic_search" />
+        </LinearLayout>
+
+        <LinearLayout
+            android:id="@+id/bottom_row_emoji"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginBottom="@dimen/bottom_row_margin_bottom"
+            android:orientation="horizontal"
+            android:visibility="gone">
+
+            <Button
+                android:id="@+id/btn_emoji_abc"
+                style="@style/KeyboardFunctionKeyStyle"
+                android:layout_width="0dp"
+                android:layout_height="@dimen/key_height"
+                android:layout_margin="@dimen/key_margin_h"
+                android:layout_weight="1.1"
+                android:text="@string/key_abc" />
+
+            <ImageButton
+                android:id="@+id/btn_emoji_tab"
+                style="@style/KeyboardIconKeyStyle"
+                android:layout_width="0dp"
+                android:layout_height="@dimen/key_height"
+                android:layout_margin="@dimen/key_margin_h"
+                android:layout_weight="1"
+                android:contentDescription="@string/key_emoji"
+                android:src="@drawable/ic_emoji" />
+
+            <Button
+                android:id="@+id/btn_emoji_gif"
+                style="@style/KeyboardFunctionKeyStyle"
+                android:layout_width="0dp"
+                android:layout_height="@dimen/key_height"
+                android:layout_margin="@dimen/key_margin_h"
+                android:layout_weight="1"
+                android:alpha="0.5"
+                android:enabled="false"
+                android:text="@string/key_gif" />
+
+            <ImageButton
+                android:id="@+id/btn_emoji_sticker"
+                style="@style/KeyboardIconKeyStyle"
+                android:layout_width="0dp"
+                android:layout_height="@dimen/key_height"
+                android:layout_margin="@dimen/key_margin_h"
+                android:layout_weight="1"
+                android:alpha="0.5"
+                android:contentDescription="@string/key_gif"
+                android:src="@drawable/ic_emoji_sticker" />
+
+            <Button
+                android:id="@+id/btn_emoji_emoticon"
+                style="@style/KeyboardFunctionKeyStyle"
+                android:layout_width="0dp"
+                android:layout_height="@dimen/key_height"
+                android:layout_margin="@dimen/key_margin_h"
+                android:layout_weight="1"
+                android:alpha="0.5"
+                android:enabled="false"
+                android:text="@string/key_emoticon" />
+
+            <ImageButton
+                android:id="@+id/btn_emoji_delete"
+                style="@style/KeyboardIconKeyStyle"
+                android:layout_width="0dp"
+                android:layout_height="@dimen/key_height"
+                android:layout_margin="@dimen/key_margin_h"
+                android:layout_weight="1.2"
+                android:contentDescription="@string/key_delete"
+                android:src="@drawable/ic_backspace" />
+        </LinearLayout>
+    </LinearLayout>
+
+    <View
+        android:id="@+id/system_nav_spacer"
+        android:layout_width="match_parent"
+        android:layout_height="@dimen/system_nav_spacer_height"
+        android:background="@color/keyboard_background" />
+</LinearLayout>

@@ -1,0 +1,149 @@
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  font-family: Inter, Segoe UI, Arial, sans-serif;
+  background: #0f172a;
+  color: #e2e8f0;
+}
+
+.app {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 24px;
+}
+
+header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 16px;
+  margin-bottom: 24px;
+}
+
+header h1 {
+  margin: 0 0 6px;
+  font-size: 1.8rem;
+}
+
+header p {
+  margin: 0;
+  color: #94a3b8;
+}
+
+.stats {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 16px;
+  margin-bottom: 24px;
+}
+
+.stat-card {
+  background: #1e293b;
+  border: 1px solid #334155;
+  border-radius: 12px;
+  padding: 16px;
+}
+
+.stat-card .label {
+  display: block;
+  color: #94a3b8;
+  font-size: 0.85rem;
+  margin-bottom: 8px;
+}
+
+.stat-card strong {
+  font-size: 1.5rem;
+}
+
+.filters {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 16px;
+  margin-bottom: 20px;
+}
+
+label {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  font-size: 0.9rem;
+  color: #cbd5e1;
+}
+
+select,
+input {
+  background: #1e293b;
+  color: #e2e8f0;
+  border: 1px solid #475569;
+  border-radius: 8px;
+  padding: 10px 12px;
+}
+
+.btn {
+  border: none;
+  border-radius: 8px;
+  padding: 10px 16px;
+  cursor: pointer;
+  font-weight: 600;
+}
+
+.btn.primary {
+  background: #2563eb;
+  color: white;
+}
+
+.table-wrap {
+  overflow-x: auto;
+  border: 1px solid #334155;
+  border-radius: 12px;
+  background: #1e293b;
+}
+
+table {
+  width: 100%;
+  border-collapse: collapse;
+  min-width: 900px;
+}
+
+th,
+td {
+  padding: 12px 14px;
+  border-bottom: 1px solid #334155;
+  text-align: left;
+  vertical-align: top;
+}
+
+th {
+  background: #111827;
+  color: #cbd5e1;
+  font-size: 0.85rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+td {
+  font-size: 0.92rem;
+}
+
+.mono {
+  font-family: Consolas, Monaco, monospace;
+  font-size: 0.82rem;
+  word-break: break-all;
+}
+
+.badge {
+  display: inline-block;
+  padding: 4px 8px;
+  border-radius: 999px;
+  background: #334155;
+  font-size: 0.75rem;
+}
+
+.empty {
+  text-align: center;
+  color: #94a3b8;
+  padding: 28px;
+}

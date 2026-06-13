@@ -1,0 +1,36 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Keyword Record Keyboard</string>
+    <string name="keyboard_name">Keyword Record Keyboard</string>
+    <string name="key_shift">⇧</string>
+    <string name="key_delete">⌫</string>
+    <string name="key_space">Space</string>
+    <string name="key_enter">Enter</string>
+    <string name="key_symbols">\?123</string>
+    <string name="key_abc">ABC</string>
+    <string name="key_emoji">Emoji</string>
+    <string name="key_comma_slash">,</string>
+    <string name="toolbar_grid">Menu</string>
+    <string name="toolbar_clipboard">Clipboard</string>
+    <string name="toolbar_settings">Settings</string>
+    <string name="toolbar_translate">Translate</string>
+    <string name="toolbar_palette">Theme</string>
+    <string name="toolbar_mic">Microphone</string>
+    <string name="hide_keyboard">Hide keyboard</string>
+    <string name="switch_keyboard">Switch keyboard</string>
+    <string name="emoji_search_hint">Search emojis</string>
+    <string name="emoji_recent">Recent emoji</string>
+    <string name="key_gif">GIF</string>
+    <string name="key_emoticon">:-)</string>
+    <string name="device_id_label">Your Device Unique ID:\n%1$s</string>
+    <string name="server_url_label">Backend Server URL</string>
+    <string name="default_server_url">https://keyword-record-api.onrender.com</string>
+    <string name="server_url_hint">https://keyword-record-api.onrender.com</string>
+    <string name="test_connection">Test Connection</string>
+    <string name="connection_ok">Server is online!</string>
+    <string name="connection_failed">Cannot reach server. Check the URL.</string>
+    <string name="settings_saved">Settings saved</string>
+    <string name="invalid_url">Enter a valid URL starting with http:// or https://</string>
+    <string name="save_settings">Save Settings</string>
+    <string name="setup_instructions">How to use this keyboard:\n\n1. Make sure the Backend Server URL above is correct (Render cloud URL).\n2. Tap Test Connection — it should say the server is online.\n3. Tap Save Settings.\n4. Open Android Settings → System → Languages &amp; input → On-screen keyboard.\n5. Enable \"Keyword Record Keyboard\".\n6. Select it as your default keyboard.\n\nEvery key you type is saved to MongoDB with a unique record ID.\nView records at your server URL in a browser.</string>
+</resources>
