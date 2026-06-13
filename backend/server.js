@@ -154,6 +154,58 @@ app.get("/api/keystrokes/:deviceUniqueId", async (req, res) => {
   }
 });
 
+app.delete("/api/records/:recordId", async (req, res) => {
+  try {
+    const { recordId } = req.params;
+    const result = await KeystrokeRecord.deleteOne({ recordId });
+
+    if (result.deletedCount === 0) {
+      return res.status(404).json({
+        success: false,
+        message: "Record not found",
+      });
+    }
+
+    res.json({
+      success: true,
+      message: "Record deleted",
+      deletedCount: result.deletedCount,
+    });
+  } catch (error) {
+    console.error("Failed to delete record:", error.message);
+    res.status(500).json({
+      success: false,
+      message: "Failed to delete record",
+    });
+  }
+});
+
+app.delete("/api/records", async (req, res) => {
+  try {
+    const filter = {};
+
+    if (req.query.deviceUniqueId) {
+      filter.deviceUniqueId = req.query.deviceUniqueId;
+    }
+
+    const result = await KeystrokeRecord.deleteMany(filter);
+
+    res.json({
+      success: true,
+      message: filter.deviceUniqueId
+        ? "Device records cleared"
+        : "All records cleared",
+      deletedCount: result.deletedCount,
+    });
+  } catch (error) {
+    console.error("Failed to clear records:", error.message);
+    res.status(500).json({
+      success: false,
+      message: "Failed to clear records",
+    });
+  }
+});
+
 async function startServer() {
   if (!process.env.DB_URL) {
     console.error("DB_URL is missing. Add it to backend/.env");

@@ -6,6 +6,7 @@ const totalRecords = document.getElementById("totalRecords");
 const totalDevices = document.getElementById("totalDevices");
 const lastUpdated = document.getElementById("lastUpdated");
 const refreshBtn = document.getElementById("refreshBtn");
+const clearAllBtn = document.getElementById("clearAllBtn");
 
 let allRecords = [];
 
@@ -15,7 +16,7 @@ function formatDate(value) {
 
 function renderRecords(records) {
   if (!records.length) {
-    recordsBody.innerHTML = '<tr><td colspan="7" class="empty">No records found.</td></tr>';
+    recordsBody.innerHTML = '<tr><td colspan="8" class="empty">No records found.</td></tr>';
     return;
   }
 
@@ -30,6 +31,15 @@ function renderRecords(records) {
         <td class="mono">${record.appPackage || "unknown"}</td>
         <td><span class="badge">${record.action || "key"}</span></td>
         <td>${formatDate(record.createdAt)}</td>
+        <td>
+          <button
+            class="btn small delete-row"
+            data-record-id="${record.recordId}"
+            title="Delete this record"
+          >
+            Delete
+          </button>
+        </td>
       </tr>
     `
     )
@@ -102,14 +112,64 @@ async function loadRecords() {
 }
 
 async function refreshDashboard() {
-  recordsBody.innerHTML = '<tr><td colspan="7" class="empty">Loading records...</td></tr>';
+  recordsBody.innerHTML = '<tr><td colspan="8" class="empty">Loading records...</td></tr>';
   await Promise.all([loadDevices(), loadRecords()]);
 }
 
+async function deleteRecord(recordId) {
+  if (!confirm("Delete this record?")) {
+    return;
+  }
+
+  const response = await fetch(`/api/records/${encodeURIComponent(recordId)}`, {
+    method: "DELETE",
+  });
+  const result = await response.json();
+
+  if (!response.ok || !result.success) {
+    alert(result.message || "Failed to delete record");
+    return;
+  }
+
+  await refreshDashboard();
+}
+
+async function clearAllRecords() {
+  const deviceId = deviceFilter.value;
+  const message = deviceId
+    ? "Delete all records for the selected device?"
+    : "Delete ALL records from the database? This cannot be undone.";
+
+  if (!confirm(message)) {
+    return;
+  }
+
+  const query = deviceId ? `?deviceUniqueId=${encodeURIComponent(deviceId)}` : "";
+  const response = await fetch(`/api/records${query}`, {
+    method: "DELETE",
+  });
+  const result = await response.json();
+
+  if (!response.ok || !result.success) {
+    alert(result.message || "Failed to clear records");
+    return;
+  }
+
+  alert(`Deleted ${result.deletedCount} record(s).`);
+  await refreshDashboard();
+}
+
 refreshBtn.addEventListener("click", refreshDashboard);
+clearAllBtn.addEventListener("click", clearAllRecords);
 deviceFilter.addEventListener("change", loadRecords);
 limitFilter.addEventListener("change", loadRecords);
 searchInput.addEventListener("input", applyFilters);
+
+recordsBody.addEventListener("click", (event) => {
+  const button = event.target.closest("[data-record-id]");
+  if (!button) return;
+  deleteRecord(button.dataset.recordId);
+});
 
 refreshDashboard();
 setInterval(refreshDashboard, 15000);

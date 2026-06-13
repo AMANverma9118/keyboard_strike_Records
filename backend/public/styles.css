@@ -95,6 +95,32 @@ input {
   color: white;
 }
 
+.btn.danger {
+  background: #dc2626;
+  color: white;
+}
+
+.btn.small {
+  padding: 6px 10px;
+  font-size: 0.8rem;
+}
+
+.header-actions {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.btn.delete-row {
+  background: #7f1d1d;
+  color: #fecaca;
+  border: 1px solid #991b1b;
+}
+
+.btn.delete-row:hover {
+  background: #991b1b;
+}
+
 .table-wrap {
   overflow-x: auto;
   border: 1px solid #334155;

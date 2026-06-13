@@ -13,7 +13,10 @@
         <h1>Keyword Record Dashboard</h1>
         <p>View everything typed from your mobile keyboard</p>
       </div>
-      <button id="refreshBtn" class="btn primary">Refresh</button>
+      <div class="header-actions">
+        <button id="clearAllBtn" class="btn danger">Clear All Data</button>
+        <button id="refreshBtn" class="btn primary">Refresh</button>
+      </div>
     </header>
 
     <section class="stats">
@@ -64,10 +67,11 @@
             <th>App</th>
             <th>Action</th>
             <th>Time</th>
+            <th></th>
           </tr>
         </thead>
         <tbody id="recordsBody">
-          <tr><td colspan="7" class="empty">Loading records...</td></tr>
+          <tr><td colspan="8" class="empty">Loading records...</td></tr>
         </tbody>
       </table>
     </section>
