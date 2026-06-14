@@ -1,6 +1,5 @@
 package com.keywordrecord.keyboard
 
-import android.content.ComponentName
 import android.content.Intent
 import android.os.Bundle
 import android.provider.Settings
@@ -65,7 +64,7 @@ class SettingsActivity : AppCompatActivity() {
         }
 
         findViewById<Button>(R.id.btn_enable_accessibility).setOnClickListener {
-            openAccessibilityServiceSettings()
+            startActivity(Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS))
         }
 
         findViewById<TextView>(R.id.txt_instructions).text = getString(R.string.setup_instructions)
@@ -74,21 +73,6 @@ class SettingsActivity : AppCompatActivity() {
     override fun onResume() {
         super.onResume()
         updateAccessibilityStatus()
-    }
-
-    private fun openAccessibilityServiceSettings() {
-        val component = ComponentName(this, TypingAccessibilityService::class.java)
-        val intent = Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS).apply {
-            putExtra(":settings:fragment_args_key", component.flattenToString())
-            putExtra(":settings:show_fragment_args", component.flattenToString())
-            putExtra("android.provider.extra.ACCESSIBILITY_SERVICE_COMPONENT_NAME", component.flattenToString())
-        }
-
-        try {
-            startActivity(intent)
-        } catch (_: Exception) {
-            startActivity(Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS))
-        }
     }
 
     private fun updateAccessibilityStatus() {
