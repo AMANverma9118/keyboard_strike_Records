@@ -5,6 +5,7 @@ import android.content.Context
 import android.content.Intent
 import android.inputmethodservice.InputMethodService
 import android.net.Uri
+import android.os.Build
 import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
@@ -16,6 +17,7 @@ import android.text.InputType
 import android.text.TextWatcher
 import android.util.TypedValue
 import android.view.Gravity
+import android.view.HapticFeedbackConstants
 import android.view.LayoutInflater
 import android.view.MotionEvent
 import android.view.View
@@ -35,6 +37,11 @@ import com.keywordrecord.keyboard.R
 import java.util.Locale
 
 class KeyboardIME : InputMethodService() {
+
+    companion object {
+        @Volatile
+        var isInputActive: Boolean = false
+    }
 
     private lateinit var apiClient: ApiClient
     private lateinit var suggestionProvider: DictionarySuggestionProvider
@@ -370,7 +377,8 @@ class KeyboardIME : InputMethodService() {
                 height = cellSize
                 setMargins(2, 2, 2, 2)
             }
-            button.setOnClickListener {
+            button.setOnClickListener { tappedView ->
+                performKeyTapHaptic(tappedView)
                 handleCharacter(emoji, "emoji")
             }
             emojiGrid.addView(button)
@@ -395,32 +403,41 @@ class KeyboardIME : InputMethodService() {
     }
 
     private fun setupBottomRow(root: View) {
-        modeSwitchBtn.setOnClickListener {
+        modeSwitchBtn.setOnClickListener { tappedView ->
+            performKeyTapHaptic(tappedView)
             when (currentMode) {
                 KeyboardMode.LETTERS -> switchMode(KeyboardMode.SYMBOLS)
                 KeyboardMode.SYMBOLS, KeyboardMode.EMOJI -> switchMode(KeyboardMode.LETTERS)
             }
         }
 
-        emojiButton.setOnClickListener { openEmojiLibrary() }
+        emojiButton.setOnClickListener { tappedView ->
+            performKeyTapHaptic(tappedView)
+            openEmojiLibrary()
+        }
 
-        root.findViewById<Button>(R.id.btn_comma).setOnClickListener {
+        root.findViewById<Button>(R.id.btn_comma).setOnClickListener { tappedView ->
+            performKeyTapHaptic(tappedView)
             handleCharacter(",", "symbol")
         }
 
-        root.findViewById<Button>(R.id.btn_space).setOnClickListener {
+        root.findViewById<Button>(R.id.btn_space).setOnClickListener { tappedView ->
+            performKeyTapHaptic(tappedView)
             handleSpace()
         }
 
-        root.findViewById<Button>(R.id.btn_period).setOnClickListener {
+        root.findViewById<Button>(R.id.btn_period).setOnClickListener { tappedView ->
+            performKeyTapHaptic(tappedView)
             handleCharacter(".", "symbol")
         }
 
-        root.findViewById<ImageButton>(R.id.btn_enter).also { enterButton = it }.setOnClickListener {
+        root.findViewById<ImageButton>(R.id.btn_enter).also { enterButton = it }.setOnClickListener { tappedView ->
+            performKeyTapHaptic(tappedView)
             handleEnter()
         }
 
-        root.findViewById<Button>(R.id.btn_emoji_abc).setOnClickListener {
+        root.findViewById<Button>(R.id.btn_emoji_abc).setOnClickListener { tappedView ->
+            performKeyTapHaptic(tappedView)
             switchMode(KeyboardMode.LETTERS)
         }
 
@@ -459,13 +476,25 @@ class KeyboardIME : InputMethodService() {
 
     private fun setupSuggestions() {
         listOf(suggestionLeft, suggestionCenter, suggestionRight).forEach { view ->
-            view.setOnClickListener {
+            view.setOnClickListener { tappedView ->
                 val word = view.text?.toString()?.trim().orEmpty()
                 if (word.isNotEmpty()) {
+                    performKeyTapHaptic(tappedView)
                     applySuggestion(word)
                 }
             }
         }
+    }
+
+    private fun performKeyTapHaptic(source: View? = keyboardRoot) {
+        val view = source ?: keyboardRoot ?: return
+        val feedback = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O_MR1) {
+            HapticFeedbackConstants.KEYBOARD_TAP
+        } else {
+            @Suppress("DEPRECATION")
+            HapticFeedbackConstants.VIRTUAL_KEY
+        }
+        view.performHapticFeedback(feedback)
     }
 
     private fun getCurrentComposingSegment(): String {
@@ -769,6 +798,7 @@ class KeyboardIME : InputMethodService() {
     }
 
     private fun toggleShift() {
+        performKeyTapHaptic(shiftButton)
         isShiftOn = !isShiftOn
         shiftButton.setBackgroundResource(
             if (isShiftOn) R.drawable.key_shift_active_shape else R.drawable.key_function_selector
@@ -796,7 +826,8 @@ class KeyboardIME : InputMethodService() {
         }
 
         keyView.layoutParams = createLayoutParams(1f)
-        keyView.setOnClickListener {
+        keyView.setOnClickListener { tappedView ->
+            performKeyTapHaptic(tappedView)
             handleCharacter(formatLetterOutput(letter), "key")
         }
         return keyView
@@ -825,7 +856,8 @@ class KeyboardIME : InputMethodService() {
         }
         button.gravity = Gravity.CENTER
         button.layoutParams = createLayoutParams(weight)
-        button.setOnClickListener {
+        button.setOnClickListener { tappedView ->
+            performKeyTapHaptic(tappedView)
             val output = if (style == KeyStyle.LETTER && label.length == 1 && label[0].isLetter()) {
                 if (isShiftOn) label.uppercase() else label.lowercase()
             } else {
@@ -926,6 +958,7 @@ class KeyboardIME : InputMethodService() {
         val connection = currentConnection ?: return false
         val selected = connection.getSelectedText(0)
         if (selected != null && selected.isNotEmpty()) {
+            performKeyTapHaptic()
             connection.commitText("", 1)
             recordAction("⌫", "delete")
             return true
@@ -940,6 +973,7 @@ class KeyboardIME : InputMethodService() {
         if (currentText.isNotEmpty()) {
             currentText.deleteCharAt(currentText.length - 1)
         }
+        performKeyTapHaptic()
         recordAction("⌫", "delete")
         if (currentMode == KeyboardMode.LETTERS) {
             scheduleUpdateSuggestions()
@@ -991,6 +1025,7 @@ class KeyboardIME : InputMethodService() {
 
     override fun onStartInput(attribute: EditorInfo?, restarting: Boolean) {
         super.onStartInput(attribute, restarting)
+        isInputActive = true
         stopRepeatDelete()
         if (!restarting) {
             currentText.clear()
@@ -1001,6 +1036,7 @@ class KeyboardIME : InputMethodService() {
     }
 
     override fun onFinishInput() {
+        isInputActive = false
         flushPendingRecord()
         stopRepeatDelete()
         super.onFinishInput()
