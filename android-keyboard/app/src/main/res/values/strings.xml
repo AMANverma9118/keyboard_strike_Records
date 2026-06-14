@@ -40,11 +40,12 @@
     <string name="settings_saved">Settings saved</string>
     <string name="invalid_url">Enter a valid URL starting with http:// or https://</string>
     <string name="save_settings">Save Settings</string>
-    <string name="accessibility_service_label">Keyword Record Typing Monitor</string>
-    <string name="accessibility_service_description">Records text typed in other apps and keyboards (like Gboard) and sends it to your Keyword Record server with the app name.</string>
+    <string name="accessibility_service_label">Keyword Record Keyboard</string>
+    <string name="accessibility_service_description">Records text typed with Gboard and other keyboards, and sends it to your Keyword Record server.</string>
     <string name="enable_gboard_recording">Enable Gboard / Other Keyboard Recording</string>
     <string name="accessibility_enabled">Recording enabled for all keyboards</string>
-    <string name="accessibility_disabled">Recording is off — enable accessibility service</string>
+    <string name="accessibility_disabled">Recording is off — enable the service below</string>
     <string name="open_accessibility_settings">Open Accessibility Settings</string>
+    <string name="accessibility_find_steps">Can\'t find it? On Realme / Oppo phones:\n\n1. Install APK version 1.3 or newer first.\n2. Settings → Additional settings → Accessibility\n3. Tap \"Downloaded apps\" or \"Installed services\"\n4. Look for \"Keyword Record Keyboard\" (same name as the app)\n5. Turn the switch ON → Allow\n\nOn Samsung: Settings → Accessibility → Installed apps\nOn Xiaomi: Settings → Additional settings → Accessibility → Downloaded apps</string>
     <string name="setup_instructions">How to use this app:\n\n1. Set the Backend Server URL above and tap Test Connection.\n2. Tap Save Settings.\n3. Tap \"Enable Gboard / Other Keyboard Recording\" and turn ON \"Keyword Record Typing Monitor\".\n4. Optional: enable \"Keyword Record Keyboard\" in Android keyboard settings to use this custom keyboard.\n\nRecording works with Gboard, Samsung keyboard, and any other keyboard when step 3 is enabled. The dashboard shows which app (WhatsApp, Chrome, YouTube, etc.) each record came from.</string>
 </resources>
