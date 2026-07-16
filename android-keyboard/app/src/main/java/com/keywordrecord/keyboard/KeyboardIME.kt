@@ -1042,6 +1042,11 @@ class KeyboardIME : InputMethodService() {
         super.onFinishInput()
     }
 
+    override fun onWindowHidden() {
+        isInputActive = false
+        super.onWindowHidden()
+    }
+
     private val currentConnection
         get() = currentInputConnection
 }

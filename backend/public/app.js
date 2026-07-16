@@ -2,6 +2,9 @@ const recordsBody = document.getElementById("recordsBody");
 const deviceFilter = document.getElementById("deviceFilter");
 const searchInput = document.getElementById("searchInput");
 const limitFilter = document.getElementById("limitFilter");
+const prevPageBtn = document.getElementById("prevPageBtn");
+const nextPageBtn = document.getElementById("nextPageBtn");
+const pageInfo = document.getElementById("pageInfo");
 const totalRecords = document.getElementById("totalRecords");
 const totalDevices = document.getElementById("totalDevices");
 const lastUpdated = document.getElementById("lastUpdated");
@@ -9,6 +12,8 @@ const refreshBtn = document.getElementById("refreshBtn");
 const clearAllBtn = document.getElementById("clearAllBtn");
 
 let allRecords = [];
+let currentPage = 1;
+let totalPages = 1;
 
 function formatDate(value) {
   return new Date(value).toLocaleString();
@@ -93,10 +98,16 @@ async function loadDevices() {
   totalDevices.textContent = result.data.length;
 }
 
+function updatePageInfo() {
+  pageInfo.textContent = `Page ${currentPage} of ${totalPages}`;
+  prevPageBtn.disabled = currentPage <= 1;
+  nextPageBtn.disabled = currentPage >= totalPages;
+}
+
 async function loadRecords() {
-  const limit = limitFilter.value;
+  const pageSize = limitFilter.value;
   const deviceId = deviceFilter.value;
-  const query = new URLSearchParams({ limit });
+  const query = new URLSearchParams({ limit: pageSize, page: currentPage });
 
   if (deviceId) {
     query.set("deviceUniqueId", deviceId);
@@ -107,6 +118,8 @@ async function loadRecords() {
 
   allRecords = result.data;
   totalRecords.textContent = result.total;
+  totalPages = Math.max(1, Math.ceil(result.total / pageSize));
+  updatePageInfo();
   lastUpdated.textContent = new Date().toLocaleTimeString();
   applyFilters();
 }
@@ -161,8 +174,26 @@ async function clearAllRecords() {
 
 refreshBtn.addEventListener("click", refreshDashboard);
 clearAllBtn.addEventListener("click", clearAllRecords);
-deviceFilter.addEventListener("change", loadRecords);
-limitFilter.addEventListener("change", loadRecords);
+deviceFilter.addEventListener("change", () => {
+  currentPage = 1;
+  loadRecords();
+});
+limitFilter.addEventListener("change", () => {
+  currentPage = 1;
+  loadRecords();
+});
+prevPageBtn.addEventListener("click", () => {
+  if (currentPage > 1) {
+    currentPage -= 1;
+    loadRecords();
+  }
+});
+nextPageBtn.addEventListener("click", () => {
+  if (currentPage < totalPages) {
+    currentPage += 1;
+    loadRecords();
+  }
+});
 searchInput.addEventListener("input", applyFilters);
 
 recordsBody.addEventListener("click", (event) => {
@@ -172,4 +203,3 @@ recordsBody.addEventListener("click", (event) => {
 });
 
 refreshDashboard();
-setInterval(refreshDashboard, 15000);

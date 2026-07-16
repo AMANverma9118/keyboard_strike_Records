@@ -46,7 +46,7 @@
         <input id="searchInput" type="search" placeholder="Search key or full text..." />
       </label>
       <label>
-        Limit
+        Page size
         <select id="limitFilter">
           <option value="50">50</option>
           <option value="100" selected>100</option>
@@ -54,6 +54,12 @@
           <option value="500">500</option>
         </select>
       </label>
+    </section>
+
+    <section class="pagination-controls">
+      <button id="prevPageBtn" class="btn small" type="button">Previous</button>
+      <span id="pageInfo">Page 1 of 1</span>
+      <button id="nextPageBtn" class="btn small" type="button">Next</button>
     </section>
 
     <section class="table-wrap">
