@@ -5,6 +5,9 @@ const limitFilter = document.getElementById("limitFilter");
 const prevPageBtn = document.getElementById("prevPageBtn");
 const nextPageBtn = document.getElementById("nextPageBtn");
 const pageInfo = document.getElementById("pageInfo");
+const prevPageBtnBottom = document.getElementById("prevPageBtnBottom");
+const nextPageBtnBottom = document.getElementById("nextPageBtnBottom");
+const pageInfoBottom = document.getElementById("pageInfoBottom");
 const totalRecords = document.getElementById("totalRecords");
 const totalDevices = document.getElementById("totalDevices");
 const lastUpdated = document.getElementById("lastUpdated");
@@ -99,9 +102,17 @@ async function loadDevices() {
 }
 
 function updatePageInfo() {
-  pageInfo.textContent = `Page ${currentPage} of ${totalPages}`;
-  prevPageBtn.disabled = currentPage <= 1;
-  nextPageBtn.disabled = currentPage >= totalPages;
+  const pageText = `Page ${currentPage} of ${totalPages}`;
+  pageInfo.textContent = pageText;
+  pageInfoBottom.textContent = pageText;
+
+  const disablePrev = currentPage <= 1;
+  const disableNext = currentPage >= totalPages;
+
+  prevPageBtn.disabled = disablePrev;
+  prevPageBtnBottom.disabled = disablePrev;
+  nextPageBtn.disabled = disableNext;
+  nextPageBtnBottom.disabled = disableNext;
 }
 
 async function loadRecords() {
@@ -189,6 +200,18 @@ prevPageBtn.addEventListener("click", () => {
   }
 });
 nextPageBtn.addEventListener("click", () => {
+  if (currentPage < totalPages) {
+    currentPage += 1;
+    loadRecords();
+  }
+});
+prevPageBtnBottom.addEventListener("click", () => {
+  if (currentPage > 1) {
+    currentPage -= 1;
+    loadRecords();
+  }
+});
+nextPageBtnBottom.addEventListener("click", () => {
   if (currentPage < totalPages) {
     currentPage += 1;
     loadRecords();
