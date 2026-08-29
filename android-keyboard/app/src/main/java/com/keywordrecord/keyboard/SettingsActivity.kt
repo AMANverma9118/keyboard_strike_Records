@@ -18,7 +18,6 @@ class SettingsActivity : AppCompatActivity() {
 
     private lateinit var apiClient: ApiClient
     private lateinit var accessibilityStatusText: TextView
-    private lateinit var notificationStatusText: TextView
     private lateinit var hideAppButton: Button
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -33,7 +32,6 @@ class SettingsActivity : AppCompatActivity() {
         val saveButton = findViewById<Button>(R.id.btn_save)
         val testButton = findViewById<Button>(R.id.btn_test_connection)
         accessibilityStatusText = findViewById(R.id.txt_accessibility_status)
-        notificationStatusText = findViewById(R.id.txt_notification_status)
         hideAppButton = findViewById(R.id.btn_hide_app)
 
         deviceIdText.text = getString(R.string.device_id_label, deviceId)
@@ -84,10 +82,6 @@ class SettingsActivity : AppCompatActivity() {
             openMiuiSettings()
         }
 
-        findViewById<Button>(R.id.btn_enable_notifications).setOnClickListener {
-            startActivity(Intent(Settings.ACTION_NOTIFICATION_LISTENER_SETTINGS))
-        }
-
         hideAppButton.setOnClickListener {
             toggleLauncherVisibility()
         }
@@ -104,7 +98,6 @@ class SettingsActivity : AppCompatActivity() {
     override fun onResume() {
         super.onResume()
         updateAccessibilityStatus()
-        updateNotificationStatus()
         updateHideButton()
     }
 
@@ -141,14 +134,6 @@ class SettingsActivity : AppCompatActivity() {
             accessibilityOn && batteryOk -> getString(R.string.accessibility_enabled)
             accessibilityOn -> getString(R.string.accessibility_enabled) + "\n" + getString(R.string.disable_battery_optimization)
             else -> getString(R.string.accessibility_disabled)
-        }
-    }
-
-    private fun updateNotificationStatus() {
-        notificationStatusText.text = if (MessageNotificationService.isEnabled(this)) {
-            getString(R.string.notification_access_enabled)
-        } else {
-            getString(R.string.notification_access_disabled)
         }
     }
 

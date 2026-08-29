@@ -111,18 +111,6 @@ input {
   flex-wrap: wrap;
 }
 
-.pagination-controls {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  margin-bottom: 16px;
-  color: #cbd5e1;
-}
-
-.pagination-controls .btn {
-  min-width: 100px;
-}
-
 .btn.delete-row {
   background: #7f1d1d;
   color: #fecaca;

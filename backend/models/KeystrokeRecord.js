@@ -39,7 +39,6 @@ const keystrokeRecordSchema = new mongoose.Schema(
         "voice",
         "paste",
         "suggestion",
-        "incoming_message",
       ],
       default: "key",
     },

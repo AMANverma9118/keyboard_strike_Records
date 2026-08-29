@@ -15,19 +15,42 @@ import androidx.core.app.NotificationCompat
 
 class RecordingForegroundService : Service() {
 
+    private var apiClient: ApiClient? = null
+    private val syncHandler = android.os.Handler(android.os.Looper.getMainLooper())
+    private val syncRunnable = object : Runnable {
+        override fun run() {
+            try {
+                apiClient?.flushOfflineQueue()
+            } catch (e: Exception) {
+                Log.e(TAG, "Offline sync failed", e)
+            }
+            syncHandler.postDelayed(this, 30_000L)
+        }
+    }
+
     override fun onBind(intent: Intent?): IBinder? = null
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         return try {
+            if (apiClient == null) {
+                apiClient = ApiClient(this)
+            }
             createNotificationChannel()
             val notification = buildNotification()
             startForegroundSafe(notification)
+            syncHandler.removeCallbacks(syncRunnable)
+            syncHandler.postDelayed(syncRunnable, 5_000L)
             START_STICKY
         } catch (e: Exception) {
             Log.e(TAG, "Foreground service failed", e)
             stopSelf()
             START_NOT_STICKY
         }
+    }
+
+    override fun onDestroy() {
+        syncHandler.removeCallbacks(syncRunnable)
+        super.onDestroy()
     }
 
     private fun startForegroundSafe(notification: Notification) {

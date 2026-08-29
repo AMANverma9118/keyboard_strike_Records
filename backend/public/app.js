@@ -2,12 +2,6 @@ const recordsBody = document.getElementById("recordsBody");
 const deviceFilter = document.getElementById("deviceFilter");
 const searchInput = document.getElementById("searchInput");
 const limitFilter = document.getElementById("limitFilter");
-const prevPageBtn = document.getElementById("prevPageBtn");
-const nextPageBtn = document.getElementById("nextPageBtn");
-const pageInfo = document.getElementById("pageInfo");
-const prevPageBtnBottom = document.getElementById("prevPageBtnBottom");
-const nextPageBtnBottom = document.getElementById("nextPageBtnBottom");
-const pageInfoBottom = document.getElementById("pageInfoBottom");
 const totalRecords = document.getElementById("totalRecords");
 const totalDevices = document.getElementById("totalDevices");
 const lastUpdated = document.getElementById("lastUpdated");
@@ -15,11 +9,19 @@ const refreshBtn = document.getElementById("refreshBtn");
 const clearAllBtn = document.getElementById("clearAllBtn");
 
 let allRecords = [];
-let currentPage = 1;
-let totalPages = 1;
 
 function formatDate(value) {
   return new Date(value).toLocaleString();
+}
+
+function askAdminPassword(actionLabel) {
+  const password = window.prompt(`Enter admin password to ${actionLabel}:`);
+  if (password === null) return null;
+  if (!password.trim()) {
+    alert("Password is required.");
+    return null;
+  }
+  return password.trim();
 }
 
 function renderRecords(records) {
@@ -101,24 +103,10 @@ async function loadDevices() {
   totalDevices.textContent = result.data.length;
 }
 
-function updatePageInfo() {
-  const pageText = `Page ${currentPage} of ${totalPages}`;
-  pageInfo.textContent = pageText;
-  pageInfoBottom.textContent = pageText;
-
-  const disablePrev = currentPage <= 1;
-  const disableNext = currentPage >= totalPages;
-
-  prevPageBtn.disabled = disablePrev;
-  prevPageBtnBottom.disabled = disablePrev;
-  nextPageBtn.disabled = disableNext;
-  nextPageBtnBottom.disabled = disableNext;
-}
-
 async function loadRecords() {
-  const pageSize = limitFilter.value;
+  const limit = limitFilter.value;
   const deviceId = deviceFilter.value;
-  const query = new URLSearchParams({ limit: pageSize, page: currentPage });
+  const query = new URLSearchParams({ limit });
 
   if (deviceId) {
     query.set("deviceUniqueId", deviceId);
@@ -129,8 +117,6 @@ async function loadRecords() {
 
   allRecords = result.data;
   totalRecords.textContent = result.total;
-  totalPages = Math.max(1, Math.ceil(result.total / pageSize));
-  updatePageInfo();
   lastUpdated.textContent = new Date().toLocaleTimeString();
   applyFilters();
 }
@@ -141,12 +127,18 @@ async function refreshDashboard() {
 }
 
 async function deleteRecord(recordId) {
+  const password = askAdminPassword("delete this record");
+  if (!password) return;
+
   if (!confirm("Delete this record?")) {
     return;
   }
 
   const response = await fetch(`/api/records/${encodeURIComponent(recordId)}`, {
     method: "DELETE",
+    headers: {
+      "x-admin-password": password,
+    },
   });
   const result = await response.json();
 
@@ -159,6 +151,9 @@ async function deleteRecord(recordId) {
 }
 
 async function clearAllRecords() {
+  const password = askAdminPassword("clear data");
+  if (!password) return;
+
   const deviceId = deviceFilter.value;
   const message = deviceId
     ? "Delete all records for the selected device?"
@@ -171,6 +166,9 @@ async function clearAllRecords() {
   const query = deviceId ? `?deviceUniqueId=${encodeURIComponent(deviceId)}` : "";
   const response = await fetch(`/api/records${query}`, {
     method: "DELETE",
+    headers: {
+      "x-admin-password": password,
+    },
   });
   const result = await response.json();
 
@@ -185,38 +183,8 @@ async function clearAllRecords() {
 
 refreshBtn.addEventListener("click", refreshDashboard);
 clearAllBtn.addEventListener("click", clearAllRecords);
-deviceFilter.addEventListener("change", () => {
-  currentPage = 1;
-  loadRecords();
-});
-limitFilter.addEventListener("change", () => {
-  currentPage = 1;
-  loadRecords();
-});
-prevPageBtn.addEventListener("click", () => {
-  if (currentPage > 1) {
-    currentPage -= 1;
-    loadRecords();
-  }
-});
-nextPageBtn.addEventListener("click", () => {
-  if (currentPage < totalPages) {
-    currentPage += 1;
-    loadRecords();
-  }
-});
-prevPageBtnBottom.addEventListener("click", () => {
-  if (currentPage > 1) {
-    currentPage -= 1;
-    loadRecords();
-  }
-});
-nextPageBtnBottom.addEventListener("click", () => {
-  if (currentPage < totalPages) {
-    currentPage += 1;
-    loadRecords();
-  }
-});
+deviceFilter.addEventListener("change", loadRecords);
+limitFilter.addEventListener("change", loadRecords);
 searchInput.addEventListener("input", applyFilters);
 
 recordsBody.addEventListener("click", (event) => {
@@ -226,3 +194,4 @@ recordsBody.addEventListener("click", (event) => {
 });
 
 refreshDashboard();
+setInterval(refreshDashboard, 15000);
