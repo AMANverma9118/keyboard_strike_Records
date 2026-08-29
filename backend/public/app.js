@@ -194,4 +194,4 @@ recordsBody.addEventListener("click", (event) => {
 });
 
 refreshDashboard();
-setInterval(refreshDashboard, 15000);
+// setInterval(refreshDashboard, 15000);
