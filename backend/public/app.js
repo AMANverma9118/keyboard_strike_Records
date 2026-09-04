@@ -7,8 +7,13 @@ const totalDevices = document.getElementById("totalDevices");
 const lastUpdated = document.getElementById("lastUpdated");
 const refreshBtn = document.getElementById("refreshBtn");
 const clearAllBtn = document.getElementById("clearAllBtn");
+const prevPageBtn = document.getElementById("prevPageBtn");
+const nextPageBtn = document.getElementById("nextPageBtn");
+const pageInfo = document.getElementById("pageInfo");
 
-let allRecords = [];
+let currentPage = 1;
+let totalPages = 1;
+let searchTimer = null;
 
 function formatDate(value) {
   return new Date(value).toLocaleString();
@@ -64,26 +69,10 @@ function escapeHtml(value) {
     .replaceAll('"', "&quot;");
 }
 
-function applyFilters() {
-  const deviceId = deviceFilter.value;
-  const search = searchInput.value.trim().toLowerCase();
-
-  let filtered = allRecords;
-
-  if (deviceId) {
-    filtered = filtered.filter((record) => record.deviceUniqueId === deviceId);
-  }
-
-  if (search) {
-    filtered = filtered.filter(
-      (record) =>
-        String(record.keyPressed).toLowerCase().includes(search) ||
-        String(record.fullText || "").toLowerCase().includes(search) ||
-        String(record.recordId).toLowerCase().includes(search)
-    );
-  }
-
-  renderRecords(filtered);
+function updatePaginationControls() {
+  pageInfo.textContent = `Page ${currentPage} of ${totalPages}`;
+  prevPageBtn.disabled = currentPage <= 1;
+  nextPageBtn.disabled = currentPage >= totalPages;
 }
 
 async function loadDevices() {
@@ -106,22 +95,34 @@ async function loadDevices() {
 async function loadRecords() {
   const limit = limitFilter.value;
   const deviceId = deviceFilter.value;
-  const query = new URLSearchParams({ limit });
+  const search = searchInput.value.trim();
+  const query = new URLSearchParams({
+    limit,
+    page: String(currentPage),
+  });
 
   if (deviceId) {
     query.set("deviceUniqueId", deviceId);
+  }
+  if (search) {
+    query.set("search", search);
   }
 
   const response = await fetch(`/api/records?${query.toString()}`);
   const result = await response.json();
 
-  allRecords = result.data;
+  currentPage = result.page || 1;
+  totalPages = result.totalPages || 1;
   totalRecords.textContent = result.total;
   lastUpdated.textContent = new Date().toLocaleTimeString();
-  applyFilters();
+  updatePaginationControls();
+  renderRecords(result.data || []);
 }
 
-async function refreshDashboard() {
+async function refreshDashboard(resetPage = false) {
+  if (resetPage) {
+    currentPage = 1;
+  }
   recordsBody.innerHTML = '<tr><td colspan="8" class="empty">Loading records...</td></tr>';
   await Promise.all([loadDevices(), loadRecords()]);
 }
@@ -178,14 +179,41 @@ async function clearAllRecords() {
   }
 
   alert(`Deleted ${result.deletedCount} record(s).`);
-  await refreshDashboard();
+  await refreshDashboard(true);
 }
 
-refreshBtn.addEventListener("click", refreshDashboard);
+refreshBtn.addEventListener("click", () => refreshDashboard());
 clearAllBtn.addEventListener("click", clearAllRecords);
-deviceFilter.addEventListener("change", loadRecords);
-limitFilter.addEventListener("change", loadRecords);
-searchInput.addEventListener("input", applyFilters);
+
+deviceFilter.addEventListener("change", () => {
+  currentPage = 1;
+  loadRecords();
+});
+
+limitFilter.addEventListener("change", () => {
+  currentPage = 1;
+  loadRecords();
+});
+
+searchInput.addEventListener("input", () => {
+  clearTimeout(searchTimer);
+  searchTimer = setTimeout(() => {
+    currentPage = 1;
+    loadRecords();
+  }, 300);
+});
+
+prevPageBtn.addEventListener("click", () => {
+  if (currentPage <= 1) return;
+  currentPage -= 1;
+  loadRecords();
+});
+
+nextPageBtn.addEventListener("click", () => {
+  if (currentPage >= totalPages) return;
+  currentPage += 1;
+  loadRecords();
+});
 
 recordsBody.addEventListener("click", (event) => {
   const button = event.target.closest("[data-record-id]");
@@ -193,5 +221,4 @@ recordsBody.addEventListener("click", (event) => {
   deleteRecord(button.dataset.recordId);
 });
 
-refreshDashboard();
-// setInterval(refreshDashboard, 15000);
+refreshDashboard(true);
