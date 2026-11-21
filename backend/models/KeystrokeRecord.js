@@ -25,6 +25,16 @@ const keystrokeRecordSchema = new mongoose.Schema(
       type: String,
       default: "unknown",
     },
+    contactName: {
+      type: String,
+      default: "",
+      index: true,
+    },
+    direction: {
+      type: String,
+      enum: ["outgoing", "incoming", "unknown"],
+      default: "unknown",
+    },
     action: {
       type: String,
       enum: [
@@ -39,6 +49,8 @@ const keystrokeRecordSchema = new mongoose.Schema(
         "voice",
         "paste",
         "suggestion",
+        "incoming",
+        "reply",
       ],
       default: "key",
     },

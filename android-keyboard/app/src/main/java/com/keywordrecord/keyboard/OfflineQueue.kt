@@ -14,7 +14,9 @@ class OfflineQueue(context: Context) {
         keyPressed: String,
         fullText: String,
         appPackage: String,
-        action: String
+        action: String,
+        contactName: String = "",
+        direction: String = "outgoing"
     ) {
         synchronized(lock) {
             val queue = readQueue()
@@ -28,6 +30,8 @@ class OfflineQueue(context: Context) {
                     put("fullText", fullText)
                     put("appPackage", appPackage)
                     put("action", action)
+                    put("contactName", contactName)
+                    put("direction", direction)
                     put("queuedAt", System.currentTimeMillis())
                 }
             )

